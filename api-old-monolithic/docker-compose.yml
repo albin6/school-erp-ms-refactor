@@ -1,0 +1,19 @@
+services:
+  server:
+    build: .
+    container_name: node_server
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    networks:
+      - school_app_network
+networks:
+  school_app_network:
+    driver: bridge

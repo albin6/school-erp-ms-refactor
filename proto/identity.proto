@@ -1,0 +1,47 @@
+syntax = "proto3";
+package identity.v1;
+option optimize_for = SPEED;
+service IdentityService {
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc GetUserById(GetUserByIdRequest) returns (UserProfile);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (UserProfile);
+}
+message ValidateTokenRequest {
+  string token = 1;
+}
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string email = 3;
+  string role = 4;
+  string tenant_id = 5;
+  string sub_role = 6;
+  string error = 7;
+}
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+message GetUserByEmailRequest {
+  string email = 1;
+}
+message UserProfile {
+  string user_id = 1;
+  string email = 2;
+  string name = 3;
+  bool is_active = 4;
+  bool is_super_admin = 5;
+  bool must_reset_password = 6;
+  string created_at = 7;
+}
+message CreateUserRequest {
+  string email = 1;
+  string name = 2;
+  string idempotency_key = 3;
+  bool must_reset_password = 4;
+}
+message CreateUserResponse {
+  string user_id = 1;
+  string temporary_password = 2;
+  bool already_existed = 3;
+}

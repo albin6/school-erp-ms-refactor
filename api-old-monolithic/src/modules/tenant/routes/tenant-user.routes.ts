@@ -1,0 +1,10 @@
+import { Router } from "express";
+import * as TenantUserController from "../controllers/tenant-user.controller";
+import { authenticate } from "../../../core/middleware/auth.middleware";
+const router = Router({ mergeParams: true });
+router.use(authenticate);
+router.post("/", TenantUserController.createUser);
+router.get("/", TenantUserController.getUsers);
+router.patch("/:userId", TenantUserController.updateUser);
+router.delete("/:userId", TenantUserController.deleteUser);
+export default router;

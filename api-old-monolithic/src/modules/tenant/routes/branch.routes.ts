@@ -1,0 +1,14 @@
+import { Router } from "express";
+import * as BranchController from "../controllers/branch.controller";
+import { authenticate } from "../../../core/middleware/auth.middleware";
+const router = Router({ mergeParams: true });
+router.use(authenticate);
+router.post("/", BranchController.createBranch);
+router.get("/", BranchController.getBranches);
+router.get("/check-slug", BranchController.checkSlug);
+router.get("/slug/:slug", BranchController.getBranchBySlug);
+router.get("/:branchId", BranchController.getBranch);
+router.patch("/:branchId", BranchController.updateBranch);
+router.patch("/:branchId/status", BranchController.toggleBlockStatus);
+router.delete("/:branchId", BranchController.deleteBranch);
+export default router;

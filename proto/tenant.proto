@@ -1,0 +1,36 @@
+syntax = "proto3";
+package tenant.v1;
+option optimize_for = SPEED;
+service TenantService {
+  rpc GetTenantBySubdomain(GetTenantBySubdomainRequest) returns (TenantInfo);
+  rpc GetTenantById(GetTenantByIdRequest) returns (TenantInfo);
+  rpc GetMembership(GetMembershipRequest) returns (MembershipInfo);
+}
+message GetTenantBySubdomainRequest {
+  string subdomain = 1;
+}
+message GetTenantByIdRequest {
+  string tenant_id = 1;
+}
+message TenantInfo {
+  bool found = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string subdomain = 4;
+  string status = 5;
+  bool is_active = 6;
+  string settings_json = 7;
+}
+message GetMembershipRequest {
+  string user_id = 1;
+  string tenant_id = 2;
+}
+message MembershipInfo {
+  bool found = 1;
+  string membership_id = 2;
+  string user_id = 3;
+  string tenant_id = 4;
+  string role = 5;
+  string sub_role = 6;
+  string branch_id = 7;
+}
