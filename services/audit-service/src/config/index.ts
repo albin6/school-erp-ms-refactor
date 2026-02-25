@@ -1,0 +1,21 @@
+import 'dotenv/config';
+import { z } from 'zod';
+const envSchema = z.object({
+    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    HTTP_PORT: z.coerce.number().default(3004),
+    DB_HOST: z.string().min(1),
+    DB_PORT: z.coerce.number().default(5432),
+    DB_NAME: z.string().min(1),
+    DB_USER: z.string().min(1),
+    DB_PASSWORD: z.string().min(1),
+    KAFKA_BROKERS: z.string().min(1),
+    KAFKA_CLIENT_ID: z.string().default('audit-service'),
+    KAFKA_GROUP_ID: z.string().default('audit-service-group'),
+});
+const parsed = envSchema.safeParse(process.env);
+if (!parsed.success) {
+    console.error(' Invalid Audit Service environment configuration:');
+    console.error(parsed.error.format());
+    process.exit(1);
+}
+export const config = parsed.data;

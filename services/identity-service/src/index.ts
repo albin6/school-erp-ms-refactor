@@ -1,0 +1,50 @@
+import * as grpc from '@grpc/grpc-js';
+import { config } from './config';
+import { logger } from './config/logger';
+import { createHttpServer } from './api/http/server';
+import { createGrpcServer } from './api/grpc/server';
+import { connectDB, closeDB } from './infrastructure/database/db';
+import { runMigrations } from './infrastructure/database/migrate';
+import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
+import { connectProducer, disconnectProducer } from './infrastructure/messaging/kafka.producer';
+const start = async () => {
+    try {
+        logger.info('Starting Identity Service...');
+        await connectDB();
+        await runMigrations();
+        await connectRedis();
+        await connectProducer();
+        const app = createHttpServer();
+        const server = app.listen(config.HTTP_PORT, () => {
+            logger.info(` HTTP REST server listening on port ${config.HTTP_PORT}`);
+        });
+        const grpcServer = createGrpcServer();
+        grpcServer.bindAsync(
+            `0.0.0.0:${config.GRPC_PORT}`,
+            grpc.ServerCredentials.createInsecure(),
+            (error, port) => {
+                if (error) {
+                    logger.error('Failed to bind gRPC server', { error });
+                    process.exit(1);
+                }
+                logger.info(` gRPC server listening on port ${port}`);
+            }
+        );
+        const gracefulShutdown = async (signal: string) => {
+            logger.info(`\nReceived ${signal}. Graceful shutdown initiated...`);
+            server.close(() => logger.info('HTTP server closed'));
+            grpcServer.forceShutdown();
+            await disconnectProducer();
+            await closeRedis();
+            await closeDB();
+            logger.info('Graceful shutdown complete. Exiting.');
+            process.exit(0);
+        };
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    } catch (err: any) {
+        logger.error('Failed to start Identity Service', { error: err.stack });
+        process.exit(1);
+    }
+};
+start();

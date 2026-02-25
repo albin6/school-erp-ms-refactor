@@ -1,0 +1,17 @@
+import { Router } from "express";
+import * as TenantAuthController from "../controllers/tenant-auth.controller";
+import * as PasswordResetController from "../controllers/password-reset.controller";
+import { tenantLogout } from "../controllers/tenant-logout.controller";
+import { tenantContext, requireTenant } from "../../../core/middleware/tenant.middleware";
+import { authenticate } from "../../../core/middleware/auth.middleware";
+const router = Router();
+router.use(tenantContext);
+router.post("/tenant/:tenantId/admin/login", TenantAuthController.tenantAdminLogin);
+router.post("/tenant/:tenantId/staff/login", TenantAuthController.tenantStaffLogin);
+router.post("/tenant/:tenantId/student/login", TenantAuthController.tenantStudentLogin);
+router.post("/tenant/:tenantId/refresh", TenantAuthController.tenantRefresh);
+router.post("/tenant/:tenantId/reset-password", PasswordResetController.resetPassword);
+router.post("/tenant/:tenantId/check-reset-required", PasswordResetController.checkResetRequired);
+router.post("/tenant/:tenantId/logout", authenticate, tenantLogout);
+router.get("/tenant/:tenantId/me", authenticate, TenantAuthController.getTenantMe);
+export default router;

@@ -1,0 +1,49 @@
+name: Monorepo CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            identity-service: 'services/identity-service/**'
+            tenant-service: 'services/tenant-service/**'
+            notification-service: 'services/notification-service/**'
+            audit-service: 'services/audit-service/**'
+            api-gateway: 'services/api-gateway/**'
+  build-and-test:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.services != '[]' && needs.detect-changes.outputs.services != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.detect-changes.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      - name: Install Dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+      - name: Type Check & Build
+        working-directory: services/${{ matrix.service }}
+        run: npm run build
+      - name: Run Tests
+        working-directory: services/${{ matrix.service }}
+        run: npm run test --if-present
+      - name: Docker Build (Dry Run)
+        working-directory: services/${{ matrix.service }}
+        run: docker build -t school-erp/${{ matrix.service }}:${{ github.sha }} .
