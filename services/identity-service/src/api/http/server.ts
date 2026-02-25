@@ -33,6 +33,10 @@ export const createHttpServer = () => {
     app.get('/health/ready', async (_req, res) => {
         res.status(200).send('READY');
     });
+    app.get('/metrics', (_req, res) => {
+        res.set('Content-Type', 'text/plain');
+        res.send('# HELP placeholder_metric A placeholder metric\n# TYPE placeholder_metric gauge\nplaceholder_metric 1');
+    });
     app.use('/api/auth', authRoutes);
     app.use(notFoundHandler);
     app.use(errorHandler);

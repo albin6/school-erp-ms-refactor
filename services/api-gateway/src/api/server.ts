@@ -24,6 +24,10 @@ export const createHttpServer = () => {
     app.use(gatewayMiddleware);
     app.get('/health/live', (_req, res) => res.status(200).send('OK'));
     app.get('/health/ready', (_req, res) => res.status(200).send('READY'));
+    app.get('/metrics', (_req, res) => {
+        res.set('Content-Type', 'text/plain');
+        res.send('# HELP placeholder_metric A placeholder metric\n# TYPE placeholder_metric gauge\nplaceholder_metric 1');
+    });
     const routes = {
         '/api/auth': config.IDENTITY_SERVICE_URL,
         '/api/users': config.IDENTITY_SERVICE_URL,
