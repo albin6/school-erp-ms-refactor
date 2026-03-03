@@ -39,10 +39,13 @@ export const getTenantSubdomain = (): string | null => {
     return null;
 };
 export const buildSubdomainUrl = (subdomain: string | null, path: string = '/'): string => {
+    const protocol = config.PROTOCOL;
+    const rootDomain = config.ROOT_DOMAIN;
+    
     if (!subdomain) {
-        return `${config.PROTOCOL}:
+        return `${protocol}://${rootDomain}${path}`;
     }
-    return `${config.PROTOCOL}:
+    return `${protocol}://${subdomain}.${rootDomain}${path}`;
 };
 export const navigateToSubdomain = (subdomain: string | null, path: string = '/') => {
     window.location.href = buildSubdomainUrl(subdomain, path);
