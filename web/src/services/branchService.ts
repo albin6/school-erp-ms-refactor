@@ -41,53 +41,53 @@ export interface BranchQueryParams {
 export const branchService = {
     getBranches: async (params: BranchQueryParams = {}) => {
         const tenantId = getTenantId();
-        const response = await api.get(`/api/tenants/${tenantId}/branches`, { params });
+        const response = await api.get(`/tenants/${tenantId}/branches`, { params });
         return response.data.data;
     },
     getBranch: async (branchId: string) => {
         const tenantId = getTenantId();
-        const response = await api.get(`/api/tenants/${tenantId}/branches/${branchId}`);
+        const response = await api.get(`/tenants/${tenantId}/branches/${branchId}`);
         return response.data.data;
     },
     createBranch: async (data: Partial<Branch>) => {
         const tenantId = getTenantId();
-        const response = await api.post(`/api/tenants/${tenantId}/branches`, data);
+        const response = await api.post(`/tenants/${tenantId}/branches`, data);
         return response.data.data;
     },
     updateBranch: async (branchId: string, data: Partial<Branch>) => {
         const tenantId = getTenantId();
-        const response = await api.patch(`/api/tenants/${tenantId}/branches/${branchId}`, data);
+        const response = await api.patch(`/tenants/${tenantId}/branches/${branchId}`, data);
         return response.data.data;
     },
     deleteBranch: async (branchId: string) => {
         const tenantId = getTenantId();
-        const response = await api.delete(`/api/tenants/${tenantId}/branches/${branchId}`);
+        const response = await api.delete(`/tenants/${tenantId}/branches/${branchId}`);
         return response.data;
     },
     toggleBlock: async (branchId: string) => {
         const tenantId = getTenantId();
-        const response = await api.patch(`/api/tenants/${tenantId}/branches/${branchId}/status`);
+        const response = await api.patch(`/tenants/${tenantId}/branches/${branchId}/status`);
         return response.data.data;
     },
     checkSlugAvailability: async (subdomain: string) => {
-        const response = await api.get(`/api/tenants/check-availability`, {
+        const response = await api.get(`/tenants/check-availability`, {
             params: { subdomain }
         });
         return response.data;
     },
     getBranchBySlug: async (slug: string) => {
         const tenantId = getTenantId();
-        const response = await api.get(`/api/tenants/${tenantId}/branches/slug/${slug}`);
+        const response = await api.get(`/tenants/${tenantId}/branches/slug/${slug}`);
         return response.data.data;
     },
     getPublicBranches: async (subdomain: string, search?: string) => {
-        const response = await api.get(`/api/tenants/public/branches`, {
+        const response = await api.get(`/tenants/public/branches`, {
             params: { subdomain, search }
         });
         return response.data.data;
     },
     getPublicBranchBySlug: async (subdomain: string, slug: string) => {
-        const response = await api.get(`/api/tenants/public/branches/slug`, {
+        const response = await api.get(`/tenants/public/branches/slug`, {
             params: { subdomain, slug }
         });
         return response.data.data;
