@@ -1,11 +1,10 @@
-import { connectDB, getPool, closeDB } from './db';
+import { getPool } from './db';
 import { hashPassword } from '../security/password.service';
 import { config } from '../../config';
 import { logger } from '../../config/logger';
 
-const seed = async () => {
+export const runSeed = async () => {
     try {
-        await connectDB();
         const pool = getPool();
 
         const email = config.SUPER_ADMIN_EMAIL || 'admin@school.com';
@@ -28,10 +27,6 @@ const seed = async () => {
         logger.info(`Super Admin created successfully: ${email}`);
     } catch (err) {
         logger.error('Seed process failed:', err);
-    } finally {
-        await closeDB();
-        process.exit(0);
+        throw err;
     }
 };
-
-seed();

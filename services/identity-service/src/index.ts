@@ -5,6 +5,7 @@ import { createHttpServer } from './api/http/server';
 import { createGrpcServer } from './api/grpc/server';
 import { connectDB, closeDB } from './infrastructure/database/db';
 import { runMigrations } from './infrastructure/database/migrate';
+import { runSeed } from './infrastructure/database/seed';
 import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
 import { connectProducer, disconnectProducer } from './infrastructure/messaging/kafka.producer';
 const start = async () => {
@@ -12,6 +13,7 @@ const start = async () => {
         logger.info('Starting Identity Service...');
         await connectDB();
         await runMigrations();
+        await runSeed();
         await connectRedis();
         await connectProducer();
         const app = createHttpServer();

@@ -21,7 +21,9 @@ export const ProtectedRoute = () => {
     if (isLoading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <Spin size="large" tip="Verifying session..." />
+                <Spin size="large" tip="Verifying session...">
+                    <div style={{ padding: '50px' }} />
+                </Spin>
             </div>
         );
     }

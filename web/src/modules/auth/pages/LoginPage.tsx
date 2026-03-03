@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Alert, message } from 'antd';
+import { Form, Input, Button, Card, Typography, Alert } from 'antd';
 import { useAuthStore } from '../../../store/authStore';
 import api from '../../../services/api';
 import { useNavigate } from 'react-router-dom';
+import { App } from 'antd';
 
 const { Title } = Typography;
 
 export const LoginPage = () => {
+    const { message } = App.useApp();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const login = useAuthStore((state) => state.login);
@@ -60,7 +62,7 @@ export const LoginPage = () => {
                         name="password"
                         rules={[{ required: true, message: 'Please input your password!' }]}
                     >
-                        <Input.Password size="large" placeholder="Password@123" />
+                        <Input.Password size="large" placeholder="Admin@123" />
                     </Form.Item>
 
                     <Form.Item>

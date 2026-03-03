@@ -1,11 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { loginUseCase } from '../../../application/use-cases/login.usecase';
+import { UserRepository } from '../../../infrastructure/database/UserRepository';
 import { AppError } from '../../../domain/errors/AppError';
 import { z } from 'zod';
 const loginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
 });
+const userRepo = new UserRepository();
+
 export const loginController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const body = loginSchema.parse(req.body);
@@ -43,6 +46,40 @@ export const loginController = async (req: Request, res: Response, next: NextFun
             next(new AppError(error.errors[0].message, 400));
             return;
         }
+        next(error);
+    }
+};
+
+export const getMeController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const userId = (req as any).user.userId;
+        const user = await userRepo.findById(userId);
+        if (!user) {
+            throw new AppError('User not found', 404);
+        }
+        res.status(200).json({
+            success: true,
+            data: {
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    isSuperAdmin: user.isSuperAdmin,
+                    isActive: user.isActive,
+                    mustResetPassword: user.mustResetPassword,
+                },
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const logoutController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        res.clearCookie('refreshToken');
+        res.status(200).json({ success: true, message: 'Logged out successfully' });
+    } catch (error) {
         next(error);
     }
 };
