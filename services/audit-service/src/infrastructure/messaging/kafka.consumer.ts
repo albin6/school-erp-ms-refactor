@@ -13,7 +13,7 @@ export const connectConsumer = async (): Promise<void> => {
     consumer = kafka.consumer({ groupId: config.KAFKA_GROUP_ID });
     await consumer.connect();
     logger.info(' Kafka consumer connected (Audit Service)');
-    await consumer.subscribe({ topic: /.*/, fromBeginning: false });
+    await consumer.subscribe({ topic: /^(?!__).*$/, fromBeginning: false });
     await consumer.run({
         eachMessage: async ({ topic, partition, message }) => {
             try {
