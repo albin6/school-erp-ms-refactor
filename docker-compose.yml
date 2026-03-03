@@ -24,7 +24,7 @@ services:
       - "5432:5432"
     networks: [ school-erp-net ]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U identity_user -d identity_db" ]
+      test: [ "CMD-SHELL", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
       - "5433:5432"
     networks: [ school-erp-net ]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U tenant_user -d tenant_db" ]
+      test: [ "CMD-SHELL", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,7 +58,7 @@ services:
       - "5434:5432"
     networks: [ school-erp-net ]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U notification_user -d notification_db" ]
+      test: [ "CMD-SHELL", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -75,7 +75,7 @@ services:
       - "5435:5432"
     networks: [ school-erp-net ]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U audit_user -d audit_db" ]
+      test: [ "CMD-SHELL", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -124,10 +124,10 @@ services:
       - "29092:29092"
     networks: [ school-erp-net ]
     healthcheck:
-      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:9092" ]
+      test: [ "CMD-SHELL", "nc -z localhost 9092" ]
       interval: 15s
       timeout: 10s
-      retries: 10
+      retries: 5
       start_period: 30s
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -218,7 +218,7 @@ services:
     container_name: api-gateway
     env_file: ./services/api-gateway/.env
     ports:
-      - "3000:3000"
+      - "8000:3000"
     depends_on:
       identity-service:
         condition: service_started
