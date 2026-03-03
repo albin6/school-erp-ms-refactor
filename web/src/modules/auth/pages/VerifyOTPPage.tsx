@@ -35,23 +35,20 @@ export const VerifyOTPPage: React.FC = () => {
             setExpiresAt(new Date(state.expiresAt).getTime());
         }
 
-        
         inputRefs.current[0]?.focus();
 
-        
         const timer = setTimeout(() => setCanResend(true), 60000);
         return () => clearTimeout(timer);
     }, [email, navigate, state]);
 
     const handleChange = (index: number, value: string) => {
-        
+
         if (value && !/^\d$/.test(value)) return;
 
         const newOtp = [...otp];
         newOtp[index] = value;
         setOtp(newOtp);
 
-        
         if (value && index < 5) {
             inputRefs.current[index + 1]?.focus();
         }
@@ -74,7 +71,6 @@ export const VerifyOTPPage: React.FC = () => {
 
         setOtp(newOtp);
 
-        
         const nextIndex = Math.min(pastedData.length, 5);
         inputRefs.current[nextIndex]?.focus();
     };
@@ -98,7 +94,6 @@ export const VerifyOTPPage: React.FC = () => {
             if (response.data.status === 'success') {
                 messageApi.success('OTP verified successfully');
 
-                
                 navigate('/reset-password', {
                     state: {
                         email,
@@ -130,7 +125,6 @@ export const VerifyOTPPage: React.FC = () => {
                 setCanResend(false);
                 inputRefs.current[0]?.focus();
 
-                
                 setTimeout(() => setCanResend(true), 60000);
             }
         } catch (error: any) {

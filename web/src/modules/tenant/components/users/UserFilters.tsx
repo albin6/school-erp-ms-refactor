@@ -17,7 +17,7 @@ export const UserFilters: React.FC<UserFiltersProps> = ({ onFilterChange }) => {
         const fetchBranches = async () => {
             try {
                 const result = await branchService.getBranches({ limit: 100 });
-                
+
                 const branchesData = result.data.branches || result.data || [];
                 setBranches(Array.isArray(branchesData) ? branchesData : []);
             } catch (err) {

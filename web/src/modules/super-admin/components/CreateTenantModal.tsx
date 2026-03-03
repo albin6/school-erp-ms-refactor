@@ -38,7 +38,6 @@ export const CreateTenantModal = ({ open, onClose, onSuccess }: CreateTenantModa
     const checkSubdomain = async (_: any, value: string) => {
         if (!value || value.length < 3) return Promise.resolve();
 
-
         return new Promise((resolve, reject) => {
             if (debounceRef.current) {
                 clearTimeout(debounceRef.current);
@@ -105,7 +104,6 @@ export const CreateTenantModal = ({ open, onClose, onSuccess }: CreateTenantModa
                 >
                     <Input placeholder="e.g., greenwood" />
                 </Form.Item>
-
 
                 <Form.Item
                     label="Admin Email"

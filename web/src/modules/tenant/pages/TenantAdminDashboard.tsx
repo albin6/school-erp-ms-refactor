@@ -44,11 +44,9 @@ const TenantAdminDashboard: React.FC = () => {
         try {
             setLoading(true);
 
-            
             const statsResponse = await api.get(`/api/tenants/${tenant.id}/dashboard/stats`);
             setStats(statsResponse.data.data);
 
-            
             const activitiesResponse = await api.get(`/api/tenants/${tenant.id}/dashboard/activities?limit=10`);
             setActivities(activitiesResponse.data.data);
         } catch (error: any) {
@@ -62,8 +60,6 @@ const TenantAdminDashboard: React.FC = () => {
         if (!tenant) return;
         fetchDashboardData();
     }, [tenant, fetchDashboardData]);
-
-
 
     const activityColumns = [
         {

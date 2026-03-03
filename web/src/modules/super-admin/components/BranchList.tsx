@@ -15,7 +15,7 @@ export const BranchList = ({ tenantId, onSelectBranch }: BranchListProps) => {
     const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
     const [pagination, setPagination] = useState({
         current: 1,
-        pageSize: 9, 
+        pageSize: 9,
         total: 0,
     });
 

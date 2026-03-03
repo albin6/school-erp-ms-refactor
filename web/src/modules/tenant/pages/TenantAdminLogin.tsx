@@ -25,7 +25,6 @@ export const TenantAdminLogin = () => {
             const tenantId = subdomain;
             await loginAdmin(values.email, values.password, tenantId);
 
-            
             const { user } = useTenantAuthStore.getState();
             if (user && user.mustResetPassword) {
                 message.info('Please reset your password to continue');
@@ -77,7 +76,6 @@ export const TenantAdminLogin = () => {
                             placeholder="Password"
                         />
                     </Form.Item>
-
 
                     <Form.Item>
                         <Button

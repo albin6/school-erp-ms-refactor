@@ -17,7 +17,7 @@ export const EditBranchModal: React.FC<EditBranchModalProps> = ({ open, branch, 
 
     useEffect(() => {
         if (open && branch) {
-            
+
             const timer = setTimeout(() => {
                 form.setFieldsValue(branch);
             }, 0);

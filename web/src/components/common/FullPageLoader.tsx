@@ -15,7 +15,7 @@ export const FullPageLoader: React.FC<FullPageLoaderProps> = ({
 
     return (
         <div
-            className={`flex flex-col items-center justify-center min-h-screen w-full 
+            className={`flex flex-col items-center justify-center min-h-screen w-full
                 ${transparent ? 'bg-white/50 absolute top-0 left-0 z-50' : 'bg-gray-50'}`}
             style={transparent ? { position: 'absolute', inset: 0 } : {}}
         >

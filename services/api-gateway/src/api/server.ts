@@ -11,7 +11,14 @@ export const createHttpServer = () => {
     app.use(helmet());
     app.use(
         cors({
-            origin: config.CORS_ALLOWED_ORIGINS.split(','),
+            origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+                const allowedOrigins = config.CORS_ALLOWED_ORIGINS.split(',');
+                if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.localhost:5173')) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
             credentials: true,
         })
     );
@@ -37,17 +44,19 @@ export const createHttpServer = () => {
     };
     Object.entries(routes).forEach(([path, target]) => {
         app.use(
-            path,
             createProxyMiddleware({
                 target,
                 changeOrigin: true,
+                pathFilter: path,
+                pathRewrite: (path: string) => path,
                 on: {
-                    error: (err: any, req: any, res: any) => {
+                    error: (err: Error, req: any, res: any) => {
                         logger.error(`Proxy Error for ${path}:`, err);
                         res.writeHead(502, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ success: false, error: 'Downstream service unavailable' }));
                     }
                 },
+                logger: logger,
             })
         );
     });

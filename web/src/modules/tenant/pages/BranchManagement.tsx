@@ -46,7 +46,7 @@ export const BranchManagement = () => {
 
     useEffect(() => {
         fetchData();
-    }, [filters]); 
+    }, [filters]);
 
     const handleTableChange = (newPagination: any, _filters: any, sorter: any) => {
         const sortBy = sorter.field as string;

@@ -16,13 +16,13 @@ export const TenantProtectedRoute = ({ allowedRoles, allowedSubRoles, children }
     useEffect(() => {
         const verifyAuth = async () => {
             if (isAuthenticated) {
-                
+
                 await checkAuth();
             }
             setIsLoading(false);
         };
         verifyAuth();
-    }, [checkAuth, isAuthenticated]); 
+    }, [checkAuth, isAuthenticated]);
 
     if (isLoading) {
         return (
@@ -34,7 +34,7 @@ export const TenantProtectedRoute = ({ allowedRoles, allowedSubRoles, children }
     }
 
     if (!isAuthenticated || !user) {
-        
+
         const path = window.location.pathname;
         if (path.startsWith('/admin')) {
             return <Navigate to="/admin" replace />;
@@ -45,12 +45,10 @@ export const TenantProtectedRoute = ({ allowedRoles, allowedSubRoles, children }
         }
     }
 
-    
     if (allowedRoles && !allowedRoles.includes(user.role)) {
         return <Navigate to="/unauthorized" replace />;
     }
 
-    
     if (allowedSubRoles && user.subRole && !allowedSubRoles.includes(user.subRole)) {
         return <Navigate to="/unauthorized" replace />;
     }

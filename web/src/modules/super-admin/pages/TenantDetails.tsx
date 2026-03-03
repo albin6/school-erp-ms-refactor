@@ -9,7 +9,6 @@ import { EditTenantModal } from '../components/EditTenantModal';
 import type { Tenant } from '../types/tenant.types';
 import { config } from '@/config';
 
-
 export const TenantDetails = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -17,7 +16,6 @@ export const TenantDetails = () => {
     const [loading, setLoading] = useState(true);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedBranch, setSelectedBranch] = useState<any | null>(null);
-
 
     useEffect(() => {
         if (id) {
@@ -36,7 +34,6 @@ export const TenantDetails = () => {
             setLoading(false);
         }
     };
-
 
     if (loading) {
         return (

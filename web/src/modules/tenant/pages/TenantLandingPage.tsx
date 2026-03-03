@@ -28,7 +28,7 @@ export const TenantLandingPage = () => {
     };
 
     useEffect(() => {
-        
+
         fetchBranches();
     }, [subdomain]);
 

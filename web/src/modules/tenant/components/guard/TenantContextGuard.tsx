@@ -14,31 +14,25 @@ export const TenantContextGuard: React.FC<TenantContextGuardProps> = ({ children
     useEffect(() => {
         const validateTenant = async () => {
             if (!subdomain) {
-                
+
                 setIsValidating(false);
                 return;
             }
 
             try {
-                
+
                 const response = await branchService.checkSlugAvailability(subdomain);
 
-                
-                
-                
-                
                 if (response.data.available === true || response.data.exists === false) {
                     console.warn(`Tenant subdomain '${subdomain}' does not exist. Redirecting to root.`);
                     navigateToSubdomain(null);
                     return;
                 }
 
-                
                 setIsValidating(false);
             } catch (error) {
                 console.error('Error validating tenant:', error);
-                
-                
+
                 navigateToSubdomain(null);
             }
         };
