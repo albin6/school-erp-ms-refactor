@@ -31,7 +31,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ open, user, onCanc
                 status: user.user.is_active ? 'ACTIVE' : 'BLOCKED'
             });
             setRole(user.role);
-            
+
             fetchBranches();
         }
     }, [open, user, form]);
@@ -39,7 +39,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ open, user, onCanc
     const fetchBranches = async () => {
         try {
             const data = await branchService.getBranches({ limit: 100, status: 'ACTIVE' });
-            
+
             const branchesData = data.branches || [];
             setBranches(Array.isArray(branchesData) ? branchesData : []);
         } catch (error) {

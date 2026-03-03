@@ -45,7 +45,7 @@ export const TenantStudentLogin = () => {
         setLoading(true);
         try {
             const tenantId = subdomain;
-            
+
             await loginStudent(values.email, values.password, tenantId);
             message.success('Login successful!');
             navigate(`/${slug}`);

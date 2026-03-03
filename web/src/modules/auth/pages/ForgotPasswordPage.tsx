@@ -27,7 +27,6 @@ export const ForgotPasswordPage: React.FC = () => {
             if (response.data.status === 'success') {
                 messageApi.success('OTP sent to your email');
 
-                
                 navigate('/verify-otp', {
                     state: {
                         email: values.email,

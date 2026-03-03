@@ -48,7 +48,7 @@ export const createHttpServer = () => {
                 target,
                 changeOrigin: true,
                 pathFilter: path,
-                pathRewrite: (path: string) => path, // Prevent stripping
+                pathRewrite: (path: string) => path,
                 on: {
                     error: (err: Error, req: any, res: any) => {
                         logger.error(`Proxy Error for ${path}:`, err);

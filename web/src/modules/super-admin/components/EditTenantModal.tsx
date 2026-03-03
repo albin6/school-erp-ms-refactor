@@ -49,7 +49,6 @@ export const EditTenantModal = ({ open, tenant, onClose, onSuccess }: EditTenant
     const checkSubdomain = async (_: any, value: string) => {
         if (!value || value.length < 3) return Promise.resolve();
 
-        
         if (tenant && value === tenant.subdomain) return Promise.resolve();
 
         return new Promise((resolve, reject) => {
@@ -59,7 +58,7 @@ export const EditTenantModal = ({ open, tenant, onClose, onSuccess }: EditTenant
 
             debounceRef.current = setTimeout(async () => {
                 try {
-                    
+
                     const response = await tenantService.checkAvailability(value, tenant?.id);
                     if (response.data.available) {
                         resolve(null);

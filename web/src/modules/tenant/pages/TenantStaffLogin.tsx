@@ -48,7 +48,6 @@ export const TenantStaffLogin = () => {
             await loginStaff(values.email, values.password, tenantId);
             message.success('Login successful!');
 
-            
             const user = useTenantAuthStore.getState().user;
             const subRole = user?.subRole?.toLowerCase().replace('_', '-') || 'dashboard';
 

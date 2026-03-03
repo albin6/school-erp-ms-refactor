@@ -21,7 +21,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 const { Header, Sider, Content } = Layout;
 
-
 const SuperAdminLayout = ({ children }: { children: React.ReactNode }) => {
     const { user, logout } = useAuthStore();
     const navigate = useNavigate();
@@ -75,7 +74,6 @@ const SuperAdminLayout = ({ children }: { children: React.ReactNode }) => {
         },
     ];
 
-    
     const selectedKey = location.pathname.startsWith('/tenants') ? '/tenants' : location.pathname;
 
     return (
@@ -128,7 +126,6 @@ const SuperAdminLayout = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
-
 const Dashboard = () => {
     return (
         <div>
@@ -148,7 +145,6 @@ const Dashboard = () => {
         </div>
     );
 };
-
 
 const StatCard = ({ title, value, change }: { title: string; value: string; change: string }) => (
     <div className="bg-white rounded-lg shadow p-6">

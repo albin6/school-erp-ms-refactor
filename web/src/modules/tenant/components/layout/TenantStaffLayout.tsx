@@ -24,35 +24,13 @@ export const TenantStaffLayout = () => {
         try {
             await logout(tenant?.id || '');
             message.success('Logged out successfully');
-            // Redirect to the staff login page using the current slug
+
             navigate(`/${slug || tenant?.subdomain || ''}/staff`);
         } catch (error) {
             message.error('Logout failed');
         }
     };
 
-    // Determine the dashboard path based on role/subrole if needed, 
-    // but typically it's just relative or absolute.
-    // For now, assuming they are under /:slug/staff/...
-    // We'll just route to the current path or a generic dashboard home.
-    // Actually, the router structure is /:slug/staff/principal etc.
-    // So the "Dashboard" link should probably point to /:slug/staff/dashboard or specific subrole path.
-    // Implementation Plan said: "Sidebar: Single 'Dashboard' item."
-
-    // We need to construct the link dynamically or just use the current path base?
-    // The router has specific paths for roles: /principal, /teacher etc.
-    // Let's check the Router again.
-    // <Route path="dashboard" element={<StaffDashboard />} />
-    // <Route path="principal" ... />
-
-    // We should probably point to the root of their dashboard which seems to be dependent on their role.
-    // However, for simplicity and ensuring it works for all staff, we can point to specific paths if we know them, 
-    // or just 'dashboard' if that's the common one. 
-    // Looking at TenantRouter.tsx:
-    // path="dashboard" -> Accessible to all STAFF.
-    // path="principal" -> Accessible to PRINCIPAL.
-
-    // Let's use a smart getter for the dashboard link.
     const getDashboardPath = () => {
         const basePath = `/${slug || tenant?.subdomain}/staff`;
         if (user?.subRole === 'PRINCIPAL') return `${basePath}/principal`;
@@ -104,7 +82,7 @@ export const TenantStaffLayout = () => {
                 </div>
                 <Menu
                     mode="inline"
-                    // We can just highlight 'dashboard' always for now since it's the only item
+
                     selectedKeys={['dashboard']}
                     items={menuItems}
                     style={{ borderRight: 0 }}

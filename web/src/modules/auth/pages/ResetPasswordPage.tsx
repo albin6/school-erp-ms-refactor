@@ -88,11 +88,11 @@ export const ResetPasswordPage: React.FC = () => {
                         const targetSlug = branch_slug || tenantSubdomain;
 
                         if (role === 'STUDENT') {
-                            navigate(`/${targetSlug}`); // Student portal entry
+                            navigate(`/${targetSlug}`);
                         } else if (role === 'STAFF') {
-                            navigate(`/${targetSlug}/staff`); // Staff portal entry
+                            navigate(`/${targetSlug}/staff`);
                         } else {
-                            navigate('/admin'); // Fallback to admin/default
+                            navigate('/admin');
                         }
                     } else {
                         navigate('/login');

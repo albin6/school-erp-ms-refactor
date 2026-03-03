@@ -9,7 +9,6 @@ import { FullPageLoader } from '@/components/common/FullPageLoader';
 import { NotFoundPage } from '@/components/common/NotFoundPage';
 import { useTenantAuthStore } from '@/store/tenantAuthStore';
 
-
 const TenantAdminLogin = lazy(() => import('@/modules/tenant/pages/TenantAdminLogin').then(module => ({ default: module.TenantAdminLogin })));
 const TenantStaffLogin = lazy(() => import('@/modules/tenant/pages/TenantStaffLogin').then(module => ({ default: module.TenantStaffLogin })));
 const TenantStudentLogin = lazy(() => import('@/modules/tenant/pages/TenantStudentLogin').then(module => ({ default: module.TenantStudentLogin })));
@@ -27,39 +26,11 @@ const BranchSelection = lazy(() => import('@/modules/tenant/pages/users/BranchSe
 
 const StudentsManagement = lazy(() => import('@/modules/tenant/pages/StudentsManagement').then(module => ({ default: module.StudentsManagement })));
 
-
 const StudentPortalEntry = () => {
     const { isAuthenticated, user } = useTenantAuthStore();
 
     if (isAuthenticated && user?.role === 'STUDENT') {
-        // Wrap StudentDashboard in the Layout even if it's the entry point here
-        // But StudentDashboard is a page. ROUTE structure handles Layout. 
-        // We probably need to redirect to a route that HAS the layout?
-        // Or we can return the Layout Component wrapping the Dashboard?
-        // Actually, the router structure below defines where Layouts are used. 
-        // If we access /:slug/ -> StudentPortalEntry -> StudentDashboard (direct component)
-        // We should probably change this to redirect or render WITH layout.
-        // Let's rely on the Route structure being correct.
-        // If the route is `path="/:slug" element={<StudentPortalEntry />}` 
-        // and StudentPortalEntry returns `<StudentDashboard />`, it has NO LAYOUT.
 
-        // Better approach:
-        // Update the route definition for /:slug to use the Layout for authenticated students.
-        // But /:slug is shared.
-
-        // Let's modify the Routes below to wrap the Student "dashboard" part.
-        // For now, let's leave this component returning the Dashboard PAGE, 
-        // but we will wrap the ROUTE validation in the Router.
-        // Actually, if we return <StudentDashboard /> here, it renders WITHOUT layout.
-        // We should return <TenantStudentLayout><StudentDashboard /></TenantStudentLayout> ?
-        // No, Layouts usually have <Outlet />.
-
-        // Let's simplify.
-        // If authenticated as student, maybe we just redirect to /:slug/dashboard (if we create one)
-        // or we render the Layout here manually?
-
-        // Let's make the Route structure handle it. 
-        // We will add a LAYOUT route for students.
         return <Navigate to="dashboard" replace />;
     }
 
@@ -104,7 +75,7 @@ export const TenantRouter = () => {
                     { }
                     <Route index element={<StudentPortalEntry />} />
 
-                    {/* Student Routes */}
+                    {}
                     <Route element={<TenantStudentLayout />}>
                         <Route path="dashboard" element={
                             <TenantProtectedRoute allowedRoles={['STUDENT']}>
@@ -122,10 +93,10 @@ export const TenantRouter = () => {
                             </PublicRoute>
                         } />
 
-                        {/* Tenant Staff Layout */}
+                        {}
                         <Route element={<TenantStaffLayout />}>
                             <Route element={<TenantProtectedRoute allowedRoles={['STAFF']} />}>
-                                {/* General Staff Dashboard */}
+                                {}
                                 <Route path="dashboard" element={<StaffDashboard />} />
 
                                 <Route path="principal" element={

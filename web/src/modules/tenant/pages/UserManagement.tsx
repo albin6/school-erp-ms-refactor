@@ -27,7 +27,6 @@ export const UserManagement = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
 
-    
     useEffect(() => {
         if (branchId) {
             branchService.getBranch(branchId)

@@ -35,7 +35,7 @@ export const TenantStudentLayout = () => {
             key: 'dashboard',
             icon: <DashboardOutlined />,
             label: 'Dashboard',
-            onClick: () => navigate(`/${slug || tenant?.subdomain}/`), // Student home is index route of :slug
+            onClick: () => navigate(`/${slug || tenant?.subdomain}/`),
         },
     ];
 

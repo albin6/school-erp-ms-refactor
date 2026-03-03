@@ -48,7 +48,7 @@ export const BranchTable: React.FC<BranchTableProps> = ({
             title: 'Phone',
             dataIndex: 'phone',
             width: '15%',
-            responsive: ['md'] as any[], 
+            responsive: ['md'] as any[],
         },
         {
             title: 'Status',

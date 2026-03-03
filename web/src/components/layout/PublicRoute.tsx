@@ -22,15 +22,15 @@ export const PublicRoute = ({ type, children }: PublicRouteProps) => {
             if (tenantAuthStore.user.role === 'ADMIN') {
                 return <Navigate to="/admin/dashboard" replace />;
             } else if (tenantAuthStore.user.role === 'STAFF') {
-                
+
                 if (slug) {
                     const subRole = tenantAuthStore.user.subRole?.toLowerCase().replace('_', '-') || 'teacher';
                     return <Navigate to={`/${slug}/staff/${subRole}`} replace />;
                 }
-                
+
                 return <Navigate to={`/`} replace />;
             } else {
-                
+
                 if (slug) {
                     return <Navigate to={`/${slug}`} replace />;
                 }

@@ -41,7 +41,7 @@ export const getTenantSubdomain = (): string | null => {
 export const buildSubdomainUrl = (subdomain: string | null, path: string = '/'): string => {
     const protocol = config.PROTOCOL;
     const rootDomain = config.ROOT_DOMAIN;
-    
+
     if (!subdomain) {
         return `${protocol}://${rootDomain}${path}`;
     }
