@@ -35,7 +35,7 @@ export const loginUseCase = async (cmd: LoginCommand): Promise<LoginResult> => {
                 {
                     eventId: uuidv4(),
                     eventType: 'identity.login.failed',
-                    aggregateId: 'unknown',
+                    aggregateId: uuidv4(),
                     occurredAt: new Date().toISOString(),
                     correlationId: cmd.correlationId,
                     payload: { email: cmd.email, ip: cmd.ip, userAgent: cmd.userAgent, reason: 'USER_NOT_FOUND' },
