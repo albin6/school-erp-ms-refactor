@@ -22,6 +22,16 @@ export const runMigrations = async (): Promise<void> => {
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     CREATE INDEX IF NOT EXISTS idx_notif_logs_event ON notification_logs(event_id);
     CREATE INDEX IF NOT EXISTS idx_notif_logs_recipient ON notification_logs(recipient);
+    CREATE TABLE IF NOT EXISTS sent_notifications (
+      idempotency_key VARCHAR(128) PRIMARY KEY,
+      event_id UUID NOT NULL,
+      event_type VARCHAR(255) NOT NULL,
+      recipient VARCHAR(255) NOT NULL,
+      channel VARCHAR(50) NOT NULL DEFAULT 'EMAIL',
+      provider_message_id VARCHAR(255),
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_sent_notifications_event_id ON sent_notifications(event_id);
   `);
     logger.info(' notification-db migrations complete');
 };

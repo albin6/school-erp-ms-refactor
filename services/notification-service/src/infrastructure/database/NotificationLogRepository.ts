@@ -1,6 +1,15 @@
 import { getPool } from './db';
 const STALE_PROCESSING_MINUTES = 10;
 export class NotificationLogRepository {
+    async hasSuccessfulDelivery(idempotencyKey: string): Promise<boolean> {
+        const { rows } = await getPool().query(
+            `SELECT 1
+               FROM sent_notifications
+              WHERE idempotency_key = $1`,
+            [idempotencyKey]
+        );
+        return rows.length > 0;
+    }
     async claimEventProcessing(
         eventId: string,
         eventType: string,
@@ -24,6 +33,22 @@ export class NotificationLogRepository {
             [eventId, eventType, recipient, channel, STALE_PROCESSING_MINUTES]
         );
         return rowCount > 0;
+    }
+    async recordSuccessfulDelivery(
+        idempotencyKey: string,
+        eventId: string,
+        eventType: string,
+        recipient: string,
+        channel: string,
+        providerMessageId?: string
+    ): Promise<void> {
+        await getPool().query(
+            `INSERT INTO sent_notifications (
+               idempotency_key, event_id, event_type, recipient, channel, provider_message_id
+             ) VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (idempotency_key) DO NOTHING`,
+            [idempotencyKey, eventId, eventType, recipient, channel, providerMessageId ?? null]
+        );
     }
     async markEventProcessed(
         eventId: string,
