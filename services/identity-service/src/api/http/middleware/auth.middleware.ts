@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../../../infrastructure/security/token.service';
+import { isTokenBlacklisted } from '../../../infrastructure/cache/redis.client';
 import { AppError } from '../../../domain/errors/AppError';
+import { logger } from '../../../config/logger';
 
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -9,6 +11,16 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
             throw new AppError('Authentication required', 401);
         }
         const token = authHeader.split(' ')[1];
+        try {
+            const blacklisted = await isTokenBlacklisted(token);
+            if (blacklisted) {
+                throw new AppError('Invalid or expired access token', 401);
+            }
+        } catch (error) {
+            logger.warn('Redis unavailable during HTTP auth blacklist check; falling back to JWT validation only', {
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
         const payload = verifyAccessToken(token);
         (req as any).user = payload;
         next();

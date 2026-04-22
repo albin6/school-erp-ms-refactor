@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { loginUseCase } from '../../../application/use-cases/login.usecase';
+import { getPool } from '../../../infrastructure/database/db';
 import { UserRepository } from '../../../infrastructure/database/UserRepository';
+import { blacklistToken } from '../../../infrastructure/cache/redis.client';
 import { AppError } from '../../../domain/errors/AppError';
+import { decodeTokenExpiry, generateTokens, verifyRefreshToken } from '../../../infrastructure/security/token.service';
 import { z } from 'zod';
 const loginSchema = z.object({
     email: z.string().email(),
@@ -77,8 +80,59 @@ export const getMeController = async (req: Request, res: Response, next: NextFun
 
 export const logoutController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        const authHeader = req.headers.authorization;
+        const accessToken = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+        const refreshToken = req.cookies?.refreshToken as string | undefined;
+        if (accessToken) {
+            const expiry = decodeTokenExpiry(accessToken);
+            const ttlSeconds = Math.max(expiry - Math.floor(Date.now() / 1000), 1);
+            await blacklistToken(accessToken, ttlSeconds);
+        }
+        if (refreshToken) {
+            await getPool().query(
+                `UPDATE refresh_tokens
+             SET revoked_at = NOW()
+           WHERE token_hash = $1 AND revoked_at IS NULL`,
+                [refreshToken]
+            );
+        }
         res.clearCookie('refreshToken');
         res.status(200).json({ success: true, message: 'Logged out successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const refreshController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const refreshToken = req.cookies?.refreshToken as string | undefined;
+        if (!refreshToken) {
+            throw new AppError('Refresh token is required', 401);
+        }
+        const payload = verifyRefreshToken(refreshToken);
+        const { rows } = await getPool().query(
+            `SELECT user_id, expires_at, revoked_at
+         FROM refresh_tokens
+        WHERE token_hash = $1
+        ORDER BY created_at DESC
+        LIMIT 1`,
+            [refreshToken]
+        );
+        const tokenRow = rows[0];
+        if (!tokenRow || tokenRow.revoked_at || new Date(tokenRow.expires_at) <= new Date()) {
+            throw new AppError('Invalid or expired refresh token', 401);
+        }
+        const { accessToken } = generateTokens({
+            userId: payload.userId,
+            email: payload.email,
+            role: payload.role,
+            tenantId: payload.tenantId,
+            subRole: payload.subRole,
+        });
+        res.status(200).json({
+            success: true,
+            data: { accessToken },
+        });
     } catch (error) {
         next(error);
     }

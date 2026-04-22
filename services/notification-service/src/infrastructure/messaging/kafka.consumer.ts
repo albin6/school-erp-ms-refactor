@@ -21,6 +21,10 @@ export const connectConsumer = async (): Promise<void> => {
                 const valueStr = message.value?.toString();
                 if (!valueStr) return;
                 const event = JSON.parse(valueStr);
+                if (typeof event?.eventId !== 'string' || !event.eventId.trim()) {
+                    logger.warn(`Skipping message on ${topic} without a valid eventId`);
+                    return;
+                }
                 switch (topic) {
                     case 'tenant.created':
                         await processTenantCreatedEvent(event);

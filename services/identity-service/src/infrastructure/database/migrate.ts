@@ -47,6 +47,21 @@ export const runMigrations = async (): Promise<void> => {
     );
     CREATE INDEX IF NOT EXISTS idx_prt_email_active
       ON password_reset_tokens(email, used_at, expires_at);
+    CREATE TABLE IF NOT EXISTS outbox_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      aggregate_type VARCHAR(100) NOT NULL,
+      aggregate_id UUID NOT NULL,
+      event_type VARCHAR(100) NOT NULL,
+      payload JSONB NOT NULL,
+      claimed_at TIMESTAMPTZ,
+      processed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+    CREATE INDEX IF NOT EXISTS idx_identity_outbox_unprocessed
+      ON outbox_events(processed_at) WHERE processed_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_identity_outbox_claimed
+      ON outbox_events(claimed_at) WHERE processed_at IS NULL;
   `);
     logger.info(' identity-db migrations complete');
 };

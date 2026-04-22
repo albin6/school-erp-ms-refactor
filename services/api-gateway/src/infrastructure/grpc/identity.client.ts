@@ -2,6 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { config } from '../../config';
+const CircuitBreaker = require('opossum');
 const PROTO_PATH = path.resolve(__dirname, '../../../../../../proto/identity.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
@@ -19,11 +20,23 @@ export interface TokenPayload {
     tenantId: string;
     subRole: string;
 }
-export const validateToken = (token: string): Promise<TokenPayload> => {
+const shouldRetryGrpcError = (error: any): boolean => {
+    const code = error?.code;
+    const message = String(error?.message ?? '');
+    return code === grpc.status.DEADLINE_EXCEEDED ||
+        code === grpc.status.UNAVAILABLE ||
+        /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|socket hang up/i.test(message);
+};
+const callValidateToken = (token: string): Promise<TokenPayload> => {
     return new Promise((resolve, reject) => {
-        client.ValidateToken({ token }, (error: any, response: any) => {
-            if (error) return reject(new Error('Identity Service Unavailable'));
-            if (!response.valid) return reject(new Error(response.error || 'Invalid Token'));
+        const deadline = new Date(Date.now() + 3000);
+        client.ValidateToken({ token }, { deadline }, (error: any, response: any) => {
+            if (error) {
+                return reject(Object.assign(new Error('Identity Service Unavailable'), { code: error.code }));
+            }
+            if (!response.valid) {
+                return reject(Object.assign(new Error(response.error || 'Invalid Token'), { code: 'AUTH_FAILURE' }));
+            }
             resolve({
                 valid: response.valid,
                 userId: response.user_id,
@@ -34,4 +47,26 @@ export const validateToken = (token: string): Promise<TokenPayload> => {
             });
         });
     });
+};
+const breaker = new CircuitBreaker(callValidateToken, {
+    timeout: 3500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
+const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export const validateToken = async (token: string): Promise<TokenPayload> => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await breaker.fire(token);
+        } catch (error: any) {
+            lastError = error instanceof Error ? error : new Error('Identity Service Unavailable');
+            if (attempt === 0 && shouldRetryGrpcError(error)) {
+                await sleep(100);
+                continue;
+            }
+            break;
+        }
+    }
+    throw lastError ?? new Error('Identity Service Unavailable');
 };
