@@ -20,8 +20,12 @@ export const connectConsumer = async (): Promise<void> => {
                 const valueStr = message.value?.toString();
                 if (!valueStr) return;
                 const event = JSON.parse(valueStr);
+                if (typeof event?.eventId !== 'string' || !event.eventId.trim()) {
+                    logger.warn(`[Audit] Skipping message on ${topic} without a valid eventId`);
+                    return;
+                }
                 const correlationId = message.headers?.['correlation-id']?.toString() || 'system';
-                await repo.recordEvent(
+                const inserted = await repo.recordEvent(
                     event.eventId,
                     event.eventType || topic,
                     event.aggregateId || 'unknown',
@@ -29,6 +33,10 @@ export const connectConsumer = async (): Promise<void> => {
                     event.payload || {},
                     correlationId
                 );
+                if (!inserted) {
+                    logger.info(`[Audit] Skipping duplicate event ${event.eventId} on ${topic}`);
+                    return;
+                }
                 logger.debug(`[Audit] Recorded ${event.eventType} on ${topic}`);
             } catch (err: any) {
                 logger.error(`[Audit] Failed to record event on ${topic}`, { error: err.stack });
