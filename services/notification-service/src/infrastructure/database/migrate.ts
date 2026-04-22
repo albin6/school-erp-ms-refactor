@@ -15,8 +15,11 @@ export const runMigrations = async (): Promise<void> => {
       status VARCHAR(50) NOT NULL,
       error_message TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(event_id, recipient, channel)
     );
+    ALTER TABLE notification_logs
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
     CREATE INDEX IF NOT EXISTS idx_notif_logs_event ON notification_logs(event_id);
     CREATE INDEX IF NOT EXISTS idx_notif_logs_recipient ON notification_logs(recipient);
   `);
