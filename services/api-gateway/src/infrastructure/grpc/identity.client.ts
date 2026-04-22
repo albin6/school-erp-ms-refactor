@@ -21,7 +21,8 @@ export interface TokenPayload {
 }
 export const validateToken = (token: string): Promise<TokenPayload> => {
     return new Promise((resolve, reject) => {
-        client.ValidateToken({ token }, (error: any, response: any) => {
+        const deadline = new Date(Date.now() + 5000); // 5 second timeout
+        client.ValidateToken({ token }, { deadline }, (error: any, response: any) => {
             if (error) return reject(new Error('Identity Service Unavailable'));
             if (!response.valid) return reject(new Error(response.error || 'Invalid Token'));
             resolve({

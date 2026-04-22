@@ -20,7 +20,8 @@ export interface TenantDetails {
 }
 export const getTenantBySubdomain = (subdomain: string): Promise<TenantDetails> => {
     return new Promise((resolve, reject) => {
-        client.GetTenantBySubdomain({ subdomain }, (error: any, response: any) => {
+        const deadline = new Date(Date.now() + 5000); // 5 second timeout
+        client.GetTenantBySubdomain({ subdomain }, { deadline }, (error: any, response: any) => {
             if (error) return reject(new Error('Tenant Service Unavailable'));
             if (!response.found) {
                 return resolve({ found: false });
