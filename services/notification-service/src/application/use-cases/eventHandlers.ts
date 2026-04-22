@@ -3,10 +3,18 @@ import { NotificationLogRepository } from '../../infrastructure/database/Notific
 import { sendEmail } from '../../infrastructure/email/smtp.client';
 import { logger } from '../../config/logger';
 const logRepo = new NotificationLogRepository();
+const HEARTBEAT_INTERVAL_MS = 30_000;
 const buildIdempotencyKey = (eventId: string, recipient: string, channel: string): string => {
     return createHash('sha256')
         .update(`${eventId}:${recipient}:${channel}`)
         .digest('hex');
+};
+const startHeartbeat = (eventId: string, recipient: string, channel: string): NodeJS.Timeout => {
+    return setInterval(() => {
+        void logRepo.touchHeartbeat(eventId, recipient, channel).catch((error: any) => {
+            logger.warn(`Failed to update heartbeat for event ${eventId}`, { error: error.message });
+        });
+    }, HEARTBEAT_INTERVAL_MS);
 };
 export const processTenantCreatedEvent = async (event: any): Promise<void> => {
     const { eventId, payload } = event;
@@ -29,6 +37,7 @@ export const processTenantCreatedEvent = async (event: any): Promise<void> => {
     <p>You can access your portal at: <a href="http://${subdomain}.localhost:5173">http://${subdomain}.localhost:5173</a></p>
     <p>Your super-admin credentials will arrive in a separate email shortly.</p>
   `;
+    const heartbeat = startHeartbeat(eventId, adminEmail, 'EMAIL');
     try {
         const providerMessageId = await sendEmail(adminEmail, subject, html, idempotencyKey);
         await logRepo.recordSuccessfulDelivery(idempotencyKey, eventId, 'tenant.created', adminEmail, 'EMAIL', providerMessageId);
@@ -37,6 +46,8 @@ export const processTenantCreatedEvent = async (event: any): Promise<void> => {
     } catch (error: any) {
         await logRepo.markEventProcessed(eventId, adminEmail, 'EMAIL', 'FAILED', error.message);
         throw error;
+    } finally {
+        clearInterval(heartbeat);
     }
 };
 export const processIdentityUserCreatedEvent = async (event: any): Promise<void> => {
@@ -60,6 +71,7 @@ export const processIdentityUserCreatedEvent = async (event: any): Promise<void>
     <p>Your temporary password is: <b>${temporaryPassword}</b></p>
     <p>Please log in and change your password immediately.</p>
   `;
+    const heartbeat = startHeartbeat(eventId, email, 'EMAIL');
     try {
         const providerMessageId = await sendEmail(email, subject, html, idempotencyKey);
         await logRepo.recordSuccessfulDelivery(idempotencyKey, eventId, 'identity.user.created', email, 'EMAIL', providerMessageId);
@@ -68,5 +80,7 @@ export const processIdentityUserCreatedEvent = async (event: any): Promise<void>
     } catch (error: any) {
         await logRepo.markEventProcessed(eventId, email, 'EMAIL', 'FAILED', error.message);
         throw error;
+    } finally {
+        clearInterval(heartbeat);
     }
 };
