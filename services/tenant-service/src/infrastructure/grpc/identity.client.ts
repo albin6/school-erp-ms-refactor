@@ -3,6 +3,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { config } from '../../config';
 import { AppError } from '../../domain/errors/AppError';
+const CircuitBreaker = require('opossum');
 const PROTO_PATH = path.resolve(__dirname, '../../../../../../proto/identity.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true,
@@ -24,9 +25,10 @@ export interface TokenValidationResult {
     tenantId: string;
     subRole: string;
 }
-export const validateTokenGrpc = (token: string): Promise<TokenValidationResult> => {
+const callValidateToken = (token: string): Promise<TokenValidationResult> => {
     return new Promise((resolve, reject) => {
-        client.ValidateToken({ token }, (error: grpc.ServiceError | null, response: any) => {
+        const deadline = new Date(Date.now() + 3000);
+        client.ValidateToken({ token }, { deadline }, (error: grpc.ServiceError | null, response: any) => {
             if (error) {
                 return reject(new AppError('Identity Service unavailable', 503));
             }
@@ -43,4 +45,24 @@ export const validateTokenGrpc = (token: string): Promise<TokenValidationResult>
             });
         });
     });
+};
+const breaker = new CircuitBreaker(callValidateToken, {
+    timeout: 3500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
+const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export const validateTokenGrpc = async (token: string): Promise<TokenValidationResult> => {
+    let lastError: AppError | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await breaker.fire(token);
+        } catch (error: any) {
+            lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
+            if (attempt === 0) {
+                await sleep(100);
+            }
+        }
+    }
+    throw lastError ?? new AppError('Identity Service unavailable', 503);
 };

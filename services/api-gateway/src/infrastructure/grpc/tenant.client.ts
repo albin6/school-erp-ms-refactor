@@ -2,6 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { config } from '../../config';
+const CircuitBreaker = require('opossum');
 const PROTO_PATH = path.resolve(__dirname, '../../../../../../proto/tenant.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
@@ -18,9 +19,9 @@ export interface TenantDetails {
     status?: string;
     isActive?: boolean;
 }
-export const getTenantBySubdomain = (subdomain: string): Promise<TenantDetails> => {
+const callGetTenantBySubdomain = (subdomain: string): Promise<TenantDetails> => {
     return new Promise((resolve, reject) => {
-        const deadline = new Date(Date.now() + 5000); // 5 second timeout
+        const deadline = new Date(Date.now() + 3000);
         client.GetTenantBySubdomain({ subdomain }, { deadline }, (error: any, response: any) => {
             if (error) return reject(new Error('Tenant Service Unavailable'));
             if (!response.found) {
@@ -35,4 +36,24 @@ export const getTenantBySubdomain = (subdomain: string): Promise<TenantDetails> 
             });
         });
     });
+};
+const breaker = new CircuitBreaker(callGetTenantBySubdomain, {
+    timeout: 3500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
+const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export const getTenantBySubdomain = async (subdomain: string): Promise<TenantDetails> => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await breaker.fire(subdomain);
+        } catch (error: any) {
+            lastError = error instanceof Error ? error : new Error('Tenant Service Unavailable');
+            if (attempt === 0) {
+                await sleep(100);
+            }
+        }
+    }
+    throw lastError ?? new Error('Tenant Service Unavailable');
 };

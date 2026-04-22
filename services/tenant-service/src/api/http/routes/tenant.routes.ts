@@ -11,11 +11,14 @@ import {
 import { getBranchesController, createBranchController, getBranchController } from '../controllers/branch.controller';
 import { getTenantUsersController, createTenantUserController } from '../controllers/tenant-user.controller';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.middleware';
+import { AppError } from '../../../domain/errors/AppError';
 
 const router = Router();
 
 // Public routes
 router.get('/check-availability', checkAvailabilityController);
+router.get('/public/branches', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.get('/public/branches/slug', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
 
 router.use(requireAuth);
 
@@ -32,9 +35,15 @@ router.patch('/:id/unblock', requireSuperAdmin, toggleTenantStatusController);
 router.get('/:tenantId/branches', getBranchesController);
 router.post('/:tenantId/branches', createBranchController);
 router.get('/:tenantId/branches/:branchId', getBranchController);
+router.patch('/:tenantId/branches/:branchId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.delete('/:tenantId/branches/:branchId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.patch('/:tenantId/branches/:branchId/status', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.get('/:tenantId/branches/slug/:slug', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
 
 // Tenant User management
 router.get('/:tenantId/users', getTenantUsersController);
 router.post('/:tenantId/users', createTenantUserController);
+router.patch('/:tenantId/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.delete('/:tenantId/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
 
 export { router as tenantRoutes };

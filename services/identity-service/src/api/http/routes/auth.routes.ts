@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { loginController, getMeController, logoutController } from '../controllers/auth.controller';
+import { loginController, getMeController, logoutController, refreshController } from '../controllers/auth.controller';
 import { requireAuth } from '../middleware/auth.middleware';
 
 const router = Router();
 
 router.post('/login', loginController);
+router.post('/refresh', refreshController);
 router.get('/me', requireAuth, getMeController);
 router.post('/logout', requireAuth, logoutController);
 

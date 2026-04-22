@@ -73,10 +73,13 @@ export const runMigrations = async (): Promise<void> => {
       aggregate_id UUID NOT NULL,
       event_type VARCHAR(100) NOT NULL,
       payload JSONB NOT NULL,
+      claimed_at TIMESTAMPTZ,
       processed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_outbox_unprocessed ON outbox_events(processed_at) WHERE processed_at IS NULL;
+    ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+    CREATE INDEX IF NOT EXISTS idx_outbox_claimed ON outbox_events(claimed_at) WHERE processed_at IS NULL;
   `);
     logger.info(' tenant-db migrations complete');
 };

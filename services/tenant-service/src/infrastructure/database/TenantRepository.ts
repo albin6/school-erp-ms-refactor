@@ -28,6 +28,36 @@ export class TenantRepository implements ITenantRepository {
         );
         return rows[0] ? this.toAggregate(rows[0]) : null;
     }
+    async findByAnySubdomain(subdomain: string): Promise<Tenant | null> {
+        const { rows } = await getPool().query(
+            `SELECT * FROM tenants WHERE subdomain = $1`,
+            [subdomain.toLowerCase().trim()]
+        );
+        return rows[0] ? this.toAggregate(rows[0]) : null;
+    }
+    async listPaginated(page: number, limit: number): Promise<{ tenants: Tenant[]; total: number }> {
+        const offset = (page - 1) * limit;
+        const [{ rows: countRows }, { rows }] = await Promise.all([
+            getPool().query(`SELECT COUNT(*)::int AS total FROM tenants`),
+            getPool().query(
+                `SELECT * FROM tenants
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2`,
+                [limit, offset]
+            ),
+        ]);
+        return {
+            tenants: rows.map((row) => this.toAggregate(row)),
+            total: countRows[0]?.total ?? 0,
+        };
+    }
+    async existsBySubdomain(subdomain: string): Promise<boolean> {
+        const { rows } = await getPool().query(
+            `SELECT 1 FROM tenants WHERE subdomain = $1`,
+            [subdomain.toLowerCase().trim()]
+        );
+        return rows.length > 0;
+    }
     async save(tenant: Tenant, client?: PoolClient): Promise<Tenant> {
         const executor = client ?? getPool();
         const { rows } = await executor.query(
@@ -57,5 +87,8 @@ export class TenantRepository implements ITenantRepository {
             ]
         );
         return this.toAggregate(rows[0]);
+    }
+    async delete(id: string): Promise<void> {
+        await getPool().query(`DELETE FROM tenants WHERE id = $1`, [id]);
     }
 }

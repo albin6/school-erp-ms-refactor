@@ -5,9 +5,7 @@ const logRepo = new NotificationLogRepository();
 export const processTenantCreatedEvent = async (event: any): Promise<void> => {
     const { eventId, payload } = event;
     const { name, adminEmail, subdomain } = payload;
-    const isNew = await logRepo.tryLogEventProcessing(
-        eventId, 'tenant.created', adminEmail, 'EMAIL', 'SUCCESS'
-    );
+    const isNew = await logRepo.claimEventProcessing(eventId, 'tenant.created', adminEmail, 'EMAIL');
     if (!isNew) {
         logger.info(`Skipping duplicate email for event ${eventId}`);
         return;
@@ -21,18 +19,17 @@ export const processTenantCreatedEvent = async (event: any): Promise<void> => {
   `;
     try {
         await sendEmail(adminEmail, subject, html);
+        await logRepo.markEventProcessed(eventId, adminEmail, 'EMAIL', 'SUCCESS');
         logger.info(`Tenant created email sent to ${adminEmail}`);
     } catch (error: any) {
-        await logRepo.tryLogEventProcessing(eventId, 'tenant.created', adminEmail, 'EMAIL', 'FAILED', error.message);
+        await logRepo.markEventProcessed(eventId, adminEmail, 'EMAIL', 'FAILED', error.message);
         throw error;
     }
 };
 export const processIdentityUserCreatedEvent = async (event: any): Promise<void> => {
     const { eventId, payload } = event;
     const { email, name, temporaryPassword } = payload;
-    const isNew = await logRepo.tryLogEventProcessing(
-        eventId, 'identity.user.created', email, 'EMAIL', 'SUCCESS'
-    );
+    const isNew = await logRepo.claimEventProcessing(eventId, 'identity.user.created', email, 'EMAIL');
     if (!isNew) {
         logger.info(`Skipping duplicate credentials email for event ${eventId}`);
         return;
@@ -46,9 +43,10 @@ export const processIdentityUserCreatedEvent = async (event: any): Promise<void>
   `;
     try {
         await sendEmail(email, subject, html);
+        await logRepo.markEventProcessed(eventId, email, 'EMAIL', 'SUCCESS');
         logger.info(`Credentials email sent to ${email}`);
     } catch (error: any) {
-        await logRepo.tryLogEventProcessing(eventId, 'identity.user.created', email, 'EMAIL', 'FAILED', error.message);
+        await logRepo.markEventProcessed(eventId, email, 'EMAIL', 'FAILED', error.message);
         throw error;
     }
 };

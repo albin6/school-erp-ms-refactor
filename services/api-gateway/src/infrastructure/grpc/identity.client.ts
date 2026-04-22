@@ -2,6 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 import { config } from '../../config';
+const CircuitBreaker = require('opossum');
 const PROTO_PATH = path.resolve(__dirname, '../../../../../../proto/identity.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
@@ -19,9 +20,9 @@ export interface TokenPayload {
     tenantId: string;
     subRole: string;
 }
-export const validateToken = (token: string): Promise<TokenPayload> => {
+const callValidateToken = (token: string): Promise<TokenPayload> => {
     return new Promise((resolve, reject) => {
-        const deadline = new Date(Date.now() + 5000); // 5 second timeout
+        const deadline = new Date(Date.now() + 3000);
         client.ValidateToken({ token }, { deadline }, (error: any, response: any) => {
             if (error) return reject(new Error('Identity Service Unavailable'));
             if (!response.valid) return reject(new Error(response.error || 'Invalid Token'));
@@ -35,4 +36,24 @@ export const validateToken = (token: string): Promise<TokenPayload> => {
             });
         });
     });
+};
+const breaker = new CircuitBreaker(callValidateToken, {
+    timeout: 3500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
+const sleep = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export const validateToken = async (token: string): Promise<TokenPayload> => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await breaker.fire(token);
+        } catch (error: any) {
+            lastError = error instanceof Error ? error : new Error('Identity Service Unavailable');
+            if (attempt === 0) {
+                await sleep(100);
+            }
+        }
+    }
+    throw lastError ?? new Error('Identity Service Unavailable');
 };

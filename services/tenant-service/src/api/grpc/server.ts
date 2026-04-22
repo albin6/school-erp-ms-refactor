@@ -36,6 +36,26 @@ const handlers = {
             callback({ code: grpc.status.INTERNAL, details: error.message });
         }
     },
+    GetTenantById: async (call: any, callback: any) => {
+        try {
+            const tenant = await tenantRepo.findById(call.request.tenant_id);
+            if (!tenant) {
+                return callback(null, { found: false });
+            }
+            callback(null, {
+                found: true,
+                tenant_id: tenant.id,
+                name: tenant.name,
+                subdomain: tenant.subdomain,
+                status: tenant.status,
+                is_active: tenant.isActive,
+                settings_json: JSON.stringify(tenant.settings),
+            });
+        } catch (error: any) {
+            logger.error('gRPC GetTenantById error', { error: error.message });
+            callback({ code: grpc.status.INTERNAL, details: error.message });
+        }
+    },
     GetMembership: async (call: any, callback: any) => {
         try {
             const { user_id, tenant_id } = call.request;

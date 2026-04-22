@@ -8,6 +8,7 @@ import { runMigrations } from './infrastructure/database/migrate';
 import { runSeed } from './infrastructure/database/seed';
 import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
 import { connectProducer, disconnectProducer } from './infrastructure/messaging/kafka.producer';
+import { startOutboxWorker, stopOutboxWorker } from './infrastructure/messaging/outbox.worker';
 const start = async () => {
     try {
         logger.info('Starting Identity Service...');
@@ -32,8 +33,10 @@ const start = async () => {
                 logger.info(` gRPC server listening on port ${port}`);
             }
         );
+        startOutboxWorker();
         const gracefulShutdown = async (signal: string) => {
             logger.info(`\nReceived ${signal}. Graceful shutdown initiated...`);
+            stopOutboxWorker();
             server.close(() => logger.info('HTTP server closed'));
             grpcServer.forceShutdown();
             await disconnectProducer();

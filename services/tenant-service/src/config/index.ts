@@ -15,6 +15,7 @@ const envSchema = z.object({
     KAFKA_GROUP_ID: z.string().default('tenant-service-group'),
     IDENTITY_GRPC_HOST: z.string().min(1),
     CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
+    INTERNAL_AUTH_SECRET: z.string().optional(),
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {

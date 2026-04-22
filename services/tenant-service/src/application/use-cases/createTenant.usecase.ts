@@ -17,7 +17,7 @@ export interface CreateTenantResult {
 }
 const tenantRepo = new TenantRepository();
 export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<CreateTenantResult> => {
-    const existing = await tenantRepo.findBySubdomain(cmd.subdomain);
+    const existing = await tenantRepo.findByAnySubdomain(cmd.subdomain);
     if (existing) {
         throw new AppError('Tenant with this subdomain already exists', 409);
     }

@@ -3,6 +3,16 @@ import { getTenantBySubdomain } from '../infrastructure/grpc/tenant.client';
 import { validateToken } from '../infrastructure/grpc/identity.client';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger';
+import { getCachedJson, setCachedJson } from '../infrastructure/cache/redis.client';
+import { config } from '../config';
+
+interface CachedTenantContext {
+    found: boolean;
+    tenantId?: string;
+    name?: string;
+    status?: string;
+    isActive?: boolean;
+}
 
 export const gatewayMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -17,7 +27,12 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
             const subdomain = subdomainMatches[1];
             logger.info(`[${correlationId}] Resolving subdomain: ${subdomain}`, { correlationId });
             try {
-                const tenant = await getTenantBySubdomain(subdomain);
+                const cacheKey = `tenant:subdomain:${subdomain}`;
+                const cachedTenant = await getCachedJson<CachedTenantContext>(cacheKey);
+                const tenant = cachedTenant ?? await getTenantBySubdomain(subdomain);
+                if (!cachedTenant) {
+                    await setCachedJson(cacheKey, tenant, config.TENANT_CACHE_TTL_SECONDS);
+                }
                 if (!tenant.found || !tenant.isActive) {
                     logger.warn(`[${correlationId}] Tenant not found or inactive`, { correlationId });
                     res.status(404).json({ success: false, error: 'Tenant not found or inactive' });
@@ -42,6 +57,10 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
                 req.headers['x-user-email'] = payload.email;
                 req.headers['x-user-role'] = payload.role;
                 req.headers['x-user-subrole'] = payload.subRole;
+                if (config.INTERNAL_AUTH_SECRET) {
+                    req.headers['x-auth-validated'] = 'true';
+                    req.headers['x-internal-auth-secret'] = config.INTERNAL_AUTH_SECRET;
+                }
                 if (tenantId && payload.tenantId && tenantId !== payload.tenantId && payload.role !== 'SUPER_ADMIN') {
                     logger.warn(`[${correlationId}] Token tenant mismatch`, { correlationId });
                     res.status(403).json({ success: false, error: 'Token does not match tenant context' });

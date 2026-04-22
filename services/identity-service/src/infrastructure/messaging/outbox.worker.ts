@@ -41,11 +41,7 @@ const processOutbox = async () => {
         for (const row of rows) {
             try {
                 const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-                await publishEvent(
-                    row.event_type,
-                    row.aggregate_id,
-                    payload
-                );
+                await publishEvent(row.event_type, payload);
                 await pool.query(
                     `UPDATE outbox_events
                 SET processed_at = NOW(), claimed_at = NULL
@@ -73,11 +69,11 @@ const processOutbox = async () => {
 export const startOutboxWorker = () => {
     if (isWorkerRunning) return;
     isWorkerRunning = true;
-    logger.info(' Outbox Relay Worker started');
-    processOutbox();
+    logger.info(' Identity outbox worker started');
+    void processOutbox();
 };
 export const stopOutboxWorker = () => {
     isWorkerRunning = false;
     if (timeoutId) clearTimeout(timeoutId);
-    logger.info(' Outbox Relay Worker stopped');
+    logger.info('Identity outbox worker stopped');
 };
