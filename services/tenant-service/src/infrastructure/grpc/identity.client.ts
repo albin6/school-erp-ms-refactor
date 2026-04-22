@@ -25,15 +25,22 @@ export interface TokenValidationResult {
     tenantId: string;
     subRole: string;
 }
+const shouldRetryGrpcError = (error: any): boolean => {
+    const code = error?.code;
+    const message = String(error?.message ?? '');
+    return code === grpc.status.DEADLINE_EXCEEDED ||
+        code === grpc.status.UNAVAILABLE ||
+        /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|socket hang up/i.test(message);
+};
 const callValidateToken = (token: string): Promise<TokenValidationResult> => {
     return new Promise((resolve, reject) => {
         const deadline = new Date(Date.now() + 3000);
         client.ValidateToken({ token }, { deadline }, (error: grpc.ServiceError | null, response: any) => {
             if (error) {
-                return reject(new AppError('Identity Service unavailable', 503));
+                return reject(Object.assign(new AppError('Identity Service unavailable', 503), { code: error.code }));
             }
             if (!response.valid) {
-                return reject(new AppError(response.error || 'Invalid token', 401));
+                return reject(Object.assign(new AppError(response.error || 'Invalid token', 401), { code: 'AUTH_FAILURE' }));
             }
             resolve({
                 valid: response.valid,
@@ -59,9 +66,11 @@ export const validateTokenGrpc = async (token: string): Promise<TokenValidationR
             return await breaker.fire(token);
         } catch (error: any) {
             lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
-            if (attempt === 0) {
+            if (attempt === 0 && shouldRetryGrpcError(error)) {
                 await sleep(100);
+                continue;
             }
+            break;
         }
     }
     throw lastError ?? new AppError('Identity Service unavailable', 503);

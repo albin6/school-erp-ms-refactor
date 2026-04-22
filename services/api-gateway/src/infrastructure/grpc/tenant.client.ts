@@ -19,11 +19,18 @@ export interface TenantDetails {
     status?: string;
     isActive?: boolean;
 }
+const shouldRetryGrpcError = (error: any): boolean => {
+    const code = error?.code;
+    const message = String(error?.message ?? '');
+    return code === grpc.status.DEADLINE_EXCEEDED ||
+        code === grpc.status.UNAVAILABLE ||
+        /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|socket hang up/i.test(message);
+};
 const callGetTenantBySubdomain = (subdomain: string): Promise<TenantDetails> => {
     return new Promise((resolve, reject) => {
         const deadline = new Date(Date.now() + 3000);
         client.GetTenantBySubdomain({ subdomain }, { deadline }, (error: any, response: any) => {
-            if (error) return reject(new Error('Tenant Service Unavailable'));
+            if (error) return reject(Object.assign(new Error('Tenant Service Unavailable'), { code: error.code }));
             if (!response.found) {
                 return resolve({ found: false });
             }
@@ -50,9 +57,11 @@ export const getTenantBySubdomain = async (subdomain: string): Promise<TenantDet
             return await breaker.fire(subdomain);
         } catch (error: any) {
             lastError = error instanceof Error ? error : new Error('Tenant Service Unavailable');
-            if (attempt === 0) {
+            if (attempt === 0 && shouldRetryGrpcError(error)) {
                 await sleep(100);
+                continue;
             }
+            break;
         }
     }
     throw lastError ?? new Error('Tenant Service Unavailable');
