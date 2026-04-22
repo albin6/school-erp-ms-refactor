@@ -5,6 +5,11 @@ import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
 const start = async () => {
     try {
         logger.info('Starting API Gateway Edge Service...');
+        if (config.INTERNAL_AUTH_SECRET) {
+            logger.info('INTERNAL_AUTH_SECRET configured; gateway will forward trusted internal auth headers. Tenant-service must use the same value.');
+        } else {
+            logger.warn('INTERNAL_AUTH_SECRET is not configured; falling back to downstream gRPC token validation. This is safe, but the gateway/tenant-service auth shortcut is disabled.');
+        }
         await connectRedis();
         const app = createHttpServer();
         const server = app.listen(config.PORT, () => {

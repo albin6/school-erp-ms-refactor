@@ -10,6 +10,11 @@ import { startOutboxWorker, stopOutboxWorker } from './infrastructure/messaging/
 const start = async () => {
     try {
         logger.info('Starting Tenant Service...');
+        if (config.INTERNAL_AUTH_SECRET) {
+            logger.info('INTERNAL_AUTH_SECRET configured; tenant-service will trust gateway-provided auth headers when the secret matches.');
+        } else {
+            logger.warn('INTERNAL_AUTH_SECRET is not configured; falling back to Identity Service gRPC token validation for every authenticated request.');
+        }
         await connectDB();
         await runMigrations();
         await connectProducer();

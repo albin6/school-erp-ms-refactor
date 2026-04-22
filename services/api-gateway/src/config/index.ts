@@ -10,7 +10,7 @@ const envSchema = z.object({
     TENANT_GRPC_HOST: z.string().min(1),
     CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173,http://sub1.localhost:5173'),
     TENANT_CACHE_TTL_SECONDS: z.coerce.number().default(30),
-    INTERNAL_AUTH_SECRET: z.string().optional(),
+    INTERNAL_AUTH_SECRET: z.string().trim().min(1).optional(),
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
