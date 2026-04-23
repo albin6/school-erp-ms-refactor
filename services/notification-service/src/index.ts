@@ -15,7 +15,8 @@ const start = async () => {
         const server = app.listen(config.HTTP_PORT, () => {
             logger.info(` HTTP health server listening on port ${config.HTTP_PORT}`);
         });
-        await connectConsumer();
+        logger.warn('Kafka consumer initialization is running in the background; notification delivery will stay degraded until the broker becomes reachable.');
+        void connectConsumer();
         const gracefulShutdown = async (signal: string) => {
             logger.info(`\nReceived ${signal}. Graceful shutdown initiated...`);
             await disconnectConsumer();

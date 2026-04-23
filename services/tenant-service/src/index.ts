@@ -17,7 +17,8 @@ const start = async () => {
         }
         await connectDB();
         await runMigrations();
-        await connectProducer();
+        logger.warn('Kafka producer initialization is running in the background; tenant event publishing will stay degraded until the broker becomes reachable.');
+        void connectProducer();
         const app = createHttpServer();
         const server = app.listen(config.HTTP_PORT, () => {
             logger.info(` HTTP REST server listening on port ${config.HTTP_PORT}`);
