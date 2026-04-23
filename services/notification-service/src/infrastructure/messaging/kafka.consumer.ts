@@ -11,6 +11,7 @@ let shutdownRequested = false;
 
 const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 30000;
+const RETRY_JITTER_RATIO = 0.2;
 
 const kafka = new Kafka({
     clientId: config.KAFKA_CLIENT_ID,
@@ -68,8 +69,17 @@ const createConsumer = (): Consumer => {
     return nextConsumer;
 };
 
-const getRetryDelayMs = (attempt: number): number =>
-    Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, attempt));
+const getRetryDelayMs = (attempt: number): number => {
+    const exponentialDelayMs = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, Math.max(0, attempt - 1)));
+    const jitterWindowMs = Math.floor(exponentialDelayMs * RETRY_JITTER_RATIO);
+
+    if (jitterWindowMs <= 0) {
+        return exponentialDelayMs;
+    }
+
+    const jitterOffsetMs = Math.floor(Math.random() * (jitterWindowMs * 2 + 1)) - jitterWindowMs;
+    return Math.max(RETRY_BASE_MS, Math.min(RETRY_MAX_MS, exponentialDelayMs + jitterOffsetMs));
+};
 
 const scheduleReconnect = (reason: string, error?: string) => {
     if (shutdownRequested || retryTimer || connectPromise || consumer) return;
@@ -79,6 +89,8 @@ const scheduleReconnect = (reason: string, error?: string) => {
 
     logger.warn(`Kafka consumer unavailable; notification delivery is degraded. Retrying in ${delayMs}ms`, {
         attempt: nextAttempt,
+        baseDelayMs: RETRY_BASE_MS,
+        maxDelayMs: RETRY_MAX_MS,
         reason,
         error,
     });

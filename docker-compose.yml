@@ -220,10 +220,9 @@ services:
       context: .
       dockerfile: ./services/audit-service/Dockerfile
       target: production
-    container_name: audit-service
     env_file: ./services/audit-service/.env
-    ports:
-      - "3004:3000"
+    expose:
+      - "3000"
     depends_on:
       audit-db:
         condition: service_healthy
