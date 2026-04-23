@@ -14,6 +14,6 @@ export class AuditLogRepository {
          ON CONFLICT (event_id) DO NOTHING`,
             [eventId, eventType, aggregateId, occurredAt, JSON.stringify(payload), correlationId ?? null]
         );
-        return rowCount > 0;
+        return (rowCount ?? 0) > 0;
     }
 }

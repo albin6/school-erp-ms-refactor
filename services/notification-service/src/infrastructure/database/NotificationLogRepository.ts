@@ -36,7 +36,7 @@ export class NotificationLogRepository {
                )`,
             [eventId, eventType, recipient, channel, STALE_PROCESSING_MINUTES]
         );
-        return rowCount > 0;
+        return (rowCount ?? 0) > 0;
     }
     async touchHeartbeat(eventId: string, recipient: string, channel: string): Promise<void> {
         await getPool().query(
