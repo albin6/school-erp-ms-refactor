@@ -72,6 +72,8 @@ const createConsumer = (): Consumer => {
 const getRetryDelayMs = (attempt: number): number =>
     Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, attempt));
 
+const getNextOffset = (offset: string): string => (BigInt(offset) + 1n).toString();
+
 const scheduleReconnect = (reason: string, error?: string) => {
     if (shutdownRequested || retryTimer || connectPromise || consumer) return;
 
@@ -113,15 +115,24 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
             void refreshKafkaReadiness('post-subscribe');
 
             await nextConsumer.run({
+                autoCommit: false,
                 eachMessage: async ({ topic, partition, message }) => {
                     try {
                         const valueStr = message.value?.toString();
-                        if (!valueStr) return;
-                        const event = JSON.parse(valueStr);
-                        if (typeof event?.eventId !== 'string' || !event.eventId.trim()) {
-                            logger.warn(`[Audit] Skipping message on ${topic} without a valid eventId`);
+                        const nextOffset = getNextOffset(message.offset);
+                        if (!valueStr) {
+                            logger.warn(`[Audit] Skipping empty message on ${topic}`);
+                            await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
+                        const event = JSON.parse(valueStr);
+
+                        if (typeof event?.eventId !== 'string' || !event.eventId.trim()) {
+                            logger.warn(`[Audit] Skipping message on ${topic} without a valid eventId`);
+                            await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
+                            return;
+                        }
+
                         const correlationId = message.headers?.['correlation-id']?.toString() || 'system';
                         const inserted = await repo.recordEvent(
                             event.eventId,
@@ -133,11 +144,18 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                         );
                         if (!inserted) {
                             logger.info(`[Audit] Skipping duplicate event ${event.eventId} on ${topic}`);
+                            await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
+
+                        await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                         logger.debug(`[Audit] Recorded ${event.eventType} on ${topic}`);
                     } catch (err: any) {
-                        logger.error(`[Audit] Failed to record event on ${topic}`, { error: err.stack });
+                        logger.error(`[Audit] Failed to record event on ${topic}`, {
+                            partition,
+                            offset: message.offset,
+                            error: err.stack,
+                        });
                         throw err;
                     }
                 },
