@@ -9,6 +9,7 @@ volumes:
   redis_data:
   kafka_data:
   zookeeper_data:
+  zookeeper_log_data:
   grafana_data:
 services:
   identity-db:
@@ -99,18 +100,33 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log_data:/var/lib/zookeeper/log
     networks: [ school-erp-net ]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: [ "CMD-SHELL", "echo srvr | nc -w 2 localhost 2181 | grep Mode || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
+    entrypoint:
+      - /bin/bash
+      - /usr/local/bin/kafka-bootstrap.sh
     depends_on:
       zookeeper:
-        condition: service_started
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -118,13 +134,18 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_CONTROLLED_SHUTDOWN_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
+      - ./infra/kafka/kafka-bootstrap.sh:/usr/local/bin/kafka-bootstrap.sh:ro
     ports:
       - "29092:29092"
     networks: [ school-erp-net ]
+    restart: unless-stopped
+    stop_grace_period: 60s
     healthcheck:
-      test: [ "CMD-SHELL", "nc -z localhost 9092" ]
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1" ]
       interval: 15s
       timeout: 10s
       retries: 5
