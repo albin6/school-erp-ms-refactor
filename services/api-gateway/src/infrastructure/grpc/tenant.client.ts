@@ -66,3 +66,14 @@ export const getTenantBySubdomain = async (subdomain: string): Promise<TenantDet
     }
     throw lastError ?? new Error('Tenant Service Unavailable');
 };
+export const verifyTenantGrpcConnectivity = async (): Promise<void> => {
+    await new Promise<void>((resolve, reject) => {
+        const deadline = new Date(Date.now() + 3000);
+        client.GetTenantBySubdomain({ subdomain: 'gateway-startup-probe' }, { deadline }, (error: any) => {
+            if (error && shouldRetryGrpcError(error)) {
+                return reject(Object.assign(new Error('Tenant Service Unreachable'), { code: error.code }));
+            }
+            resolve();
+        });
+    });
+};

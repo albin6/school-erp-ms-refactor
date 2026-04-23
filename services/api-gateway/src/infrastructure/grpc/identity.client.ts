@@ -70,3 +70,14 @@ export const validateToken = async (token: string): Promise<TokenPayload> => {
     }
     throw lastError ?? new Error('Identity Service Unavailable');
 };
+export const verifyIdentityGrpcConnectivity = async (): Promise<void> => {
+    await new Promise<void>((resolve, reject) => {
+        const deadline = new Date(Date.now() + 3000);
+        client.ValidateToken({ token: 'gateway-startup-probe' }, { deadline }, (error: any) => {
+            if (error && shouldRetryGrpcError(error)) {
+                return reject(Object.assign(new Error('Identity Service Unreachable'), { code: error.code }));
+            }
+            resolve();
+        });
+    });
+};

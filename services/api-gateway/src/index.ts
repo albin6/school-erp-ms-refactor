@@ -2,6 +2,8 @@ import { config } from './config';
 import { logger } from './config/logger';
 import { createHttpServer } from './api/server';
 import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
+import { verifyIdentityGrpcConnectivity } from './infrastructure/grpc/identity.client';
+import { verifyTenantGrpcConnectivity } from './infrastructure/grpc/tenant.client';
 const start = async () => {
     try {
         logger.info('Starting API Gateway Edge Service...');
@@ -14,6 +16,26 @@ const start = async () => {
         const app = createHttpServer();
         const server = app.listen(config.PORT, () => {
             logger.info(` API Gateway is listening on port ${config.PORT}`);
+        });
+        void Promise.allSettled([
+            verifyIdentityGrpcConnectivity(),
+            verifyTenantGrpcConnectivity(),
+        ]).then((results) => {
+            const [identityResult, tenantResult] = results;
+            if (identityResult.status === 'fulfilled') {
+                logger.info('Identity gRPC connectivity check succeeded');
+            } else {
+                logger.warn('Identity gRPC connectivity check failed; gateway startup continues', {
+                    error: identityResult.reason instanceof Error ? identityResult.reason.message : String(identityResult.reason),
+                });
+            }
+            if (tenantResult.status === 'fulfilled') {
+                logger.info('Tenant gRPC connectivity check succeeded');
+            } else {
+                logger.warn('Tenant gRPC connectivity check failed; gateway startup continues', {
+                    error: tenantResult.reason instanceof Error ? tenantResult.reason.message : String(tenantResult.reason),
+                });
+            }
         });
         const gracefulShutdown = async (signal: string) => {
             logger.info(`\nReceived ${signal}. Graceful shutdown initiated...`);
