@@ -22,8 +22,10 @@ export const TenantContextGuard: React.FC<TenantContextGuardProps> = ({ children
             try {
 
                 const response = await branchService.checkSlugAvailability(subdomain);
+                const available = response?.available ?? response?.data?.available;
+                const exists = response?.exists ?? response?.data?.exists;
 
-                if (response.data.available === true || response.data.exists === false) {
+                if (available === true || exists === false) {
                     console.warn(`Tenant subdomain '${subdomain}' does not exist. Redirecting to root.`);
                     navigateToSubdomain(null);
                     return;

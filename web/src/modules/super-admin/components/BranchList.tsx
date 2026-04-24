@@ -28,10 +28,13 @@ export const BranchList = ({ tenantId, onSelectBranch }: BranchListProps) => {
                 search: searchText,
                 status: statusFilter,
             });
-            setBranches(response.data.branches);
+            const branchData = response.data?.branches ?? response.data ?? [];
+            const total = response.data?.pagination?.total ?? branchData.length ?? 0;
+
+            setBranches(branchData);
             setPagination((prev) => ({
                 ...prev,
-                total: response.data.pagination.total,
+                total,
             }));
         } catch (error) {
             console.error('Failed to fetch branches', error);

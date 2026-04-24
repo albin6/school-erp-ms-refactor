@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AppError } from '../../../domain/errors/AppError';
 import { logger } from '../../../config/logger';
 import { BranchRepository } from '../../../infrastructure/database/BranchRepository';
+import { TenantRepository } from '../../../infrastructure/database/TenantRepository';
 
 const createBranchSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -12,6 +13,7 @@ const createBranchSchema = z.object({
     email: z.string().email('Invalid email address').optional(),
 });
 const branchRepo = new BranchRepository();
+const tenantRepo = new TenantRepository();
 
 export const getBranchesController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -60,6 +62,57 @@ export const getBranchController = async (req: Request, res: Response, next: Nex
         if (!branch) {
             throw new AppError('Branch not found', 404);
         }
+        res.status(200).json({ success: true, data: branch });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getPublicBranchesController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const subdomain = typeof req.query.subdomain === 'string' ? req.query.subdomain.trim().toLowerCase() : '';
+        const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+
+        if (!subdomain) {
+            throw new AppError('Subdomain is required', 400);
+        }
+
+        const tenant = await tenantRepo.findBySubdomain(subdomain);
+        if (!tenant) {
+            throw new AppError('Tenant not found', 404);
+        }
+
+        logger.info(`Getting public branches for tenant subdomain: ${subdomain}`);
+        const branches = await branchRepo.listPublicByTenant(tenant.id, search);
+        res.status(200).json({ success: true, data: branches });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getPublicBranchBySlugController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const subdomain = typeof req.query.subdomain === 'string' ? req.query.subdomain.trim().toLowerCase() : '';
+        const slug = typeof req.query.slug === 'string' ? req.query.slug.trim().toLowerCase() : '';
+
+        if (!subdomain) {
+            throw new AppError('Subdomain is required', 400);
+        }
+        if (!slug) {
+            throw new AppError('Branch slug is required', 400);
+        }
+
+        const tenant = await tenantRepo.findBySubdomain(subdomain);
+        if (!tenant) {
+            throw new AppError('Tenant not found', 404);
+        }
+
+        logger.info(`Getting public branch '${slug}' for tenant subdomain: ${subdomain}`);
+        const branch = await branchRepo.findPublicBySlug(tenant.id, slug);
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+
         res.status(200).json({ success: true, data: branch });
     } catch (error) {
         next(error);

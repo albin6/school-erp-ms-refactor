@@ -9,7 +9,11 @@ const createTenantSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     subdomain: z.string().regex(/^[a-z0-9-]+$/, 'Invalid subdomain format'),
     domain: z.string().optional(),
-    adminEmail: z.string().email('Invalid email address'),
+    adminEmail: z.string().email('Invalid email address').optional(),
+    admin_email: z.string().email('Invalid email address').optional(),
+}).refine((data) => Boolean(data.adminEmail || data.admin_email), {
+    message: 'Required',
+    path: ['adminEmail'],
 });
 const updateTenantSchema = z.object({
     name: z.string().min(1).optional(),
@@ -22,13 +26,14 @@ const tenantRepo = new TenantRepository();
 export const createTenantController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const body = createTenantSchema.parse(req.body);
+        const adminEmail = body.adminEmail ?? body.admin_email!;
         const userId = (req as any).user?.userId;
         const correlationId = req.headers['x-correlation-id'] as string;
         const result = await createTenantUseCase({
             name: body.name,
             subdomain: body.subdomain,
             domain: body.domain,
-            adminEmail: body.adminEmail,
+            adminEmail,
             createdBy: userId,
             correlationId,
         });
@@ -197,6 +202,13 @@ export const checkAvailabilityController = async (req: Request, res: Response, n
             throw new AppError('Subdomain is required', 400);
         }
         const exists = await tenantRepo.existsBySubdomain(candidate);
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+            'Surrogate-Control': 'no-store',
+            ETag: `"tenant-availability-${candidate}-${Date.now()}"`,
+        });
         res.status(200).json({ success: true, available: !exists });
     } catch (error) {
         next(error);

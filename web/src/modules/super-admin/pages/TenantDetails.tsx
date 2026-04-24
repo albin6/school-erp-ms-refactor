@@ -26,7 +26,8 @@ export const TenantDetails = () => {
     const fetchTenantDetails = async () => {
         try {
             const response = await tenantService.getTenantById(id!);
-            setTenant(response.data.tenant);
+            const tenantData = response.data?.tenant ?? response.data;
+            setTenant(tenantData ?? null);
         } catch (error: any) {
             message.error(error.response?.data?.message || 'Failed to fetch tenant details');
             navigate('/tenants');

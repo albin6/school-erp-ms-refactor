@@ -8,7 +8,13 @@ import {
     toggleTenantStatusController,
     checkAvailabilityController
 } from '../controllers/tenant.controller';
-import { getBranchesController, createBranchController, getBranchController } from '../controllers/branch.controller';
+import {
+    getBranchesController,
+    createBranchController,
+    getBranchController,
+    getPublicBranchesController,
+    getPublicBranchBySlugController
+} from '../controllers/branch.controller';
 import { getTenantUsersController, createTenantUserController } from '../controllers/tenant-user.controller';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.middleware';
 import { AppError } from '../../../domain/errors/AppError';
@@ -17,8 +23,8 @@ const router = Router();
 
 // Public routes
 router.get('/check-availability', checkAvailabilityController);
-router.get('/public/branches', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
-router.get('/public/branches/slug', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+router.get('/public/branches', getPublicBranchesController);
+router.get('/public/branches/slug', getPublicBranchBySlugController);
 
 router.use(requireAuth);
 
