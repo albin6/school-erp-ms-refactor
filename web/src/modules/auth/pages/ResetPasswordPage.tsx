@@ -101,7 +101,7 @@ export const ResetPasswordPage: React.FC = () => {
             }
         } catch (error: any) {
             messageApi.error(
-                error.response?.data?.message || 'Failed to reset password. Please try again.'
+                error.response?.data?.message || error.response?.data?.error || 'Failed to reset password. Please try again.'
             );
         } finally {
             setLoading(false);

@@ -1,9 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Tenant } from '../../domain/aggregates/Tenant';
 import { TenantRepository } from '../../infrastructure/database/TenantRepository';
+import { MembershipRepository } from '../../infrastructure/database/MembershipRepository';
 import { insertOutboxEvent } from '../../infrastructure/database/outbox.repository';
 import { withTransaction } from '../../infrastructure/database/db';
 import { AppError } from '../../domain/errors/AppError';
+import { Membership } from '../../domain/aggregates/Membership';
+import { createUserGrpc } from '../../infrastructure/grpc/identity.client';
 export interface CreateTenantCommand {
     name: string;
     subdomain: string;
@@ -16,11 +19,22 @@ export interface CreateTenantResult {
     tenantId: string;
 }
 const tenantRepo = new TenantRepository();
+const membershipRepo = new MembershipRepository();
 export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<CreateTenantResult> => {
     const existing = await tenantRepo.findByAnySubdomain(cmd.subdomain);
     if (existing) {
         throw new AppError('Tenant with this subdomain already exists', 409);
     }
+
+    const adminName = `${cmd.name} Admin`;
+    const adminUser = await createUserGrpc(
+        cmd.adminEmail,
+        adminName,
+        `tenant-admin:${cmd.subdomain}:${cmd.adminEmail.toLowerCase().trim()}`,
+        true,
+        cmd.correlationId
+    );
+
     const tenant = new Tenant({
         name: cmd.name,
         subdomain: cmd.subdomain,
@@ -29,6 +43,19 @@ export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<Cre
     });
     await withTransaction(async (client) => {
         await tenantRepo.save(tenant, client);
+
+        const existingMembership = await membershipRepo.findByUserAndTenant(adminUser.userId, tenant.id);
+        if (!existingMembership) {
+            await membershipRepo.save(
+                new Membership({
+                    userId: adminUser.userId,
+                    tenantId: tenant.id,
+                    role: 'ADMIN',
+                }),
+                client
+            );
+        }
+
         await insertOutboxEvent(
             client,
             {

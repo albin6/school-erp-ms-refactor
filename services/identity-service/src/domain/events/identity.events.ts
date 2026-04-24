@@ -4,6 +4,7 @@ export interface DomainEvent {
     aggregateId: string;
     occurredAt: string;
     correlationId?: string;
+    payload?: unknown;
 }
 export interface UserCreatedEvent extends DomainEvent {
     eventType: 'identity.user.created';

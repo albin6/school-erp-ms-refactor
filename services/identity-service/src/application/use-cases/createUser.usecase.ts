@@ -58,6 +58,15 @@ export const createUserUseCase = async (cmd: CreateUserCommand): Promise<CreateU
         );
         return createdUser;
     });
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV TEMP PASSWORD] Temporary password for ${savedUser.email}: ${tempPassword}`);
+        logger.warn('Temporary password logged for local development', {
+            email: savedUser.email,
+            temporaryPassword: tempPassword,
+        });
+    }
+
     logger.info('CreateUser: new user created', { userId: savedUser.id, email: savedUser.email });
     return { userId: savedUser.id, temporaryPassword: tempPassword, alreadyExisted: false };
 };

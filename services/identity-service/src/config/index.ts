@@ -23,6 +23,7 @@ const envSchema = z.object({
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
     SMTP_FROM: z.string().default('noreply@school-erp.com'),
+    TENANT_GRPC_HOST: z.string().default('tenant-service:5000'),
     CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
     ROOT_DOMAIN: z.string().default('localhost:5173'),
     PROTOCOL: z.string().default('http'),

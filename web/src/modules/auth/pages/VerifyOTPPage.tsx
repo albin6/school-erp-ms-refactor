@@ -103,7 +103,7 @@ export const VerifyOTPPage: React.FC = () => {
             }
         } catch (error: any) {
             messageApi.error(
-                error.response?.data?.message || 'Invalid OTP. Please try again.'
+                error.response?.data?.message || error.response?.data?.error || 'Invalid OTP. Please try again.'
             );
             setOtp(['', '', '', '', '', '']);
             inputRefs.current[0]?.focus();
@@ -129,7 +129,7 @@ export const VerifyOTPPage: React.FC = () => {
             }
         } catch (error: any) {
             messageApi.error(
-                error.response?.data?.message || 'Failed to resend OTP'
+                error.response?.data?.message || error.response?.data?.error || 'Failed to resend OTP'
             );
         } finally {
             setResendLoading(false);

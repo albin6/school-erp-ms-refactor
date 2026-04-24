@@ -36,7 +36,7 @@ export const ForgotPasswordPage: React.FC = () => {
             }
         } catch (error: any) {
             messageApi.error(
-                error.response?.data?.message || 'Failed to send OTP. Please try again.'
+                error.response?.data?.message || error.response?.data?.error || 'Failed to send OTP. Please try again.'
             );
         } finally {
             setLoading(false);

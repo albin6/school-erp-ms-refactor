@@ -61,7 +61,7 @@ export const TenantPasswordReset = () => {
             message.success('Password reset successfully!');
             navigate('/admin/dashboard');
         } catch (error: any) {
-            message.error(error.response?.data?.message || 'Failed to reset password');
+            message.error(error.response?.data?.message || error.response?.data?.error || 'Failed to reset password');
         } finally {
             setLoading(false);
         }
