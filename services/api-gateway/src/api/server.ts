@@ -11,7 +11,6 @@ import { gatewayMiddleware } from './middleware';
 export const createHttpServer = () => {
     const app = express();
     app.use(helmet());
-    app.use(express.json()); // Add JSON body parser
     app.use(
         cors({
             origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
