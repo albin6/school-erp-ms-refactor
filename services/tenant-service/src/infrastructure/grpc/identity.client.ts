@@ -31,6 +31,16 @@ export interface CreateUserResult {
     temporaryPassword: string;
     alreadyExisted: boolean;
 }
+
+export interface UserProfileResult {
+    userId: string;
+    email: string;
+    name: string;
+    isActive: boolean;
+    isSuperAdmin: boolean;
+    mustResetPassword: boolean;
+    createdAt: string;
+}
 const shouldRetryGrpcError = (error: any): boolean => {
     const code = error?.code;
     const message = String(error?.message ?? '');
@@ -108,6 +118,32 @@ const createUserBreaker = new CircuitBreaker(callCreateUser, {
     errorThresholdPercentage: 50,
     resetTimeout: 10000,
 });
+
+const callGetUserById = (userId: string): Promise<UserProfileResult> => {
+    return new Promise((resolve, reject) => {
+        const deadline = new Date(Date.now() + 3000);
+        client.GetUserById({ user_id: userId }, { deadline }, (error: grpc.ServiceError | null, response: any) => {
+            if (error) {
+                return reject(Object.assign(new AppError('Identity Service unavailable', 503), { code: error.code }));
+            }
+            resolve({
+                userId: response.user_id,
+                email: response.email,
+                name: response.name,
+                isActive: response.is_active,
+                isSuperAdmin: response.is_super_admin,
+                mustResetPassword: response.must_reset_password,
+                createdAt: response.created_at,
+            });
+        });
+    });
+};
+
+const getUserByIdBreaker = new CircuitBreaker(callGetUserById, {
+    timeout: 3500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
 export const validateTokenGrpc = async (token: string): Promise<TokenValidationResult> => {
     let lastError: AppError | null = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -136,6 +172,23 @@ export const createUserGrpc = async (
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
             return await createUserBreaker.fire(email, name, idempotencyKey, mustResetPassword, correlationId);
+        } catch (error: any) {
+            lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
+            if (attempt === 0 && shouldRetryGrpcError(error)) {
+                await sleep(100);
+                continue;
+            }
+            break;
+        }
+    }
+    throw lastError ?? new AppError('Identity Service unavailable', 503);
+};
+
+export const getUserByIdGrpc = async (userId: string): Promise<UserProfileResult> => {
+    let lastError: AppError | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await getUserByIdBreaker.fire(userId);
         } catch (error: any) {
             lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
             if (attempt === 0 && shouldRetryGrpcError(error)) {

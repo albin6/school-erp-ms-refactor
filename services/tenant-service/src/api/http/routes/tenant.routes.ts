@@ -16,6 +16,7 @@ import {
     getPublicBranchBySlugController
 } from '../controllers/branch.controller';
 import { getTenantUsersController, createTenantUserController } from '../controllers/tenant-user.controller';
+import { getDashboardStatsController, getDashboardActivitiesController } from '../controllers/dashboard.controller';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.middleware';
 import { AppError } from '../../../domain/errors/AppError';
 
@@ -51,5 +52,9 @@ router.get('/:tenantId/users', getTenantUsersController);
 router.post('/:tenantId/users', createTenantUserController);
 router.patch('/:tenantId/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
 router.delete('/:tenantId/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+
+// Tenant dashboard
+router.get('/:tenantId/dashboard/stats', getDashboardStatsController);
+router.get('/:tenantId/dashboard/activities', getDashboardActivitiesController);
 
 export { router as tenantRoutes };

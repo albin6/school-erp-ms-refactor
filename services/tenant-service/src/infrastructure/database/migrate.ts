@@ -66,6 +66,9 @@ export const runMigrations = async (): Promise<void> => {
     CREATE INDEX IF NOT EXISTS idx_memberships_tenant_role ON memberships(tenant_id, role, sub_role);
     CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
     CREATE INDEX IF NOT EXISTS idx_memberships_branch ON memberships(tenant_id, branch_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_single_principal_per_branch
+      ON memberships(tenant_id, branch_id)
+      WHERE role = 'STAFF' AND sub_role = 'PRINCIPAL' AND branch_id IS NOT NULL;
     -- Outbox Table for Transactional Outbox Pattern
     CREATE TABLE IF NOT EXISTS outbox_events (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

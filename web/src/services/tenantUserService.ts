@@ -36,11 +36,45 @@ export interface UserQueryParams {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
 }
+
+interface TenantUserListResult {
+    success: boolean;
+    data: {
+        users: TenantUser[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+        };
+    };
+}
+
 export const tenantUserService = {
     getUsers: async (params: UserQueryParams = {}) => {
         const tenantId = getTenantId();
         const response = await api.get(`/tenants/${tenantId}/users`, { params });
-        return response.data;
+        const payload = response.data?.data;
+        const users = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.users)
+                ? payload.users
+                : [];
+
+        const page = payload?.pagination?.page ?? params.page ?? 1;
+        const limit = payload?.pagination?.limit ?? params.limit ?? users.length ?? 0;
+        const total = payload?.pagination?.total ?? users.length;
+
+        return {
+            ...response.data,
+            data: {
+                users,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                },
+            },
+        } satisfies TenantUserListResult;
     },
     createUser: async (data: any) => {
         const tenantId = getTenantId();

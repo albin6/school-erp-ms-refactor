@@ -27,11 +27,16 @@ export const UserManagement = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<TenantUser | null>(null);
 
+    const getErrorMessage = (error: any, fallback: string) =>
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        fallback;
+
     useEffect(() => {
         if (branchId) {
             branchService.getBranch(branchId)
                 .then(setBranch)
-                .catch(() => message.error('Failed to load branch details'));
+                .catch((error) => message.error(getErrorMessage(error, 'Failed to load branch details')));
         }
     }, [branchId]);
 
@@ -54,7 +59,7 @@ export const UserManagement = () => {
                 total: result.data.pagination.total
             });
         } catch (error) {
-            message.error('Failed to load users');
+            message.error(getErrorMessage(error, 'Failed to load users'));
         } finally {
             setLoading(false);
         }
@@ -82,7 +87,7 @@ export const UserManagement = () => {
             message.success('User deleted');
             fetchData();
         } catch (error: any) {
-            message.error(error.response?.data?.message || 'Delete failed');
+            message.error(getErrorMessage(error, 'Delete failed'));
         }
     };
 

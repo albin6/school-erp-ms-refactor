@@ -44,10 +44,10 @@ const TenantAdminDashboard: React.FC = () => {
         try {
             setLoading(true);
 
-            const statsResponse = await api.get(`/api/tenants/${tenant.id}/dashboard/stats`);
+            const statsResponse = await api.get(`/tenants/${tenant.id}/dashboard/stats`);
             setStats(statsResponse.data.data);
 
-            const activitiesResponse = await api.get(`/api/tenants/${tenant.id}/dashboard/activities?limit=10`);
+            const activitiesResponse = await api.get(`/tenants/${tenant.id}/dashboard/activities?limit=10`);
             setActivities(activitiesResponse.data.data);
         } catch (error: any) {
             message.error(error.response?.data?.message || 'Failed to load dashboard data');

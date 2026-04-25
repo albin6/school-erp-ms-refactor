@@ -35,6 +35,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ open, onCancel
         }
     };
 
+    const getErrorMessage = (error: any, fallback: string) =>
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        fallback;
+
     const handleSubmit = async (values: any) => {
         setLoading(true);
         try {
@@ -43,7 +48,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ open, onCancel
             form.resetFields();
             onSuccess();
         } catch (error: any) {
-            message.error(error.response?.data?.message || 'Failed to create user');
+            message.error(getErrorMessage(error, 'Failed to create user'));
         } finally {
             setLoading(false);
         }

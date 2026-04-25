@@ -38,11 +38,41 @@ export interface BranchQueryParams {
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
 }
+
+interface BranchListResult {
+    branches: Branch[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+    data: Branch[] | { branches?: Branch[]; pagination?: { page?: number; limit?: number; total?: number } };
+}
+
 export const branchService = {
     getBranches: async (params: BranchQueryParams = {}) => {
         const tenantId = getTenantId();
         const response = await api.get(`/tenants/${tenantId}/branches`, { params });
-        return response.data.data;
+        const payload = response.data?.data;
+        const branches = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.branches)
+                ? payload.branches
+                : [];
+
+        const page = payload?.pagination?.page ?? params.page ?? 1;
+        const limit = payload?.pagination?.limit ?? params.limit ?? branches.length ?? 0;
+        const total = payload?.pagination?.total ?? branches.length;
+
+        return {
+            branches,
+            pagination: {
+                page,
+                limit,
+                total,
+            },
+            data: payload ?? branches,
+        } satisfies BranchListResult;
     },
     getBranch: async (branchId: string) => {
         const tenantId = getTenantId();
