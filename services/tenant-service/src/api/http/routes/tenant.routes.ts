@@ -13,12 +13,20 @@ import {
     createBranchController,
     getBranchController,
     getPublicBranchesController,
-    getPublicBranchBySlugController
+    getPublicBranchBySlugController,
+    updateBranchController,
+    deleteBranchController,
+    toggleBranchStatusController,
+    getBranchBySlugController
 } from '../controllers/branch.controller';
-import { getTenantUsersController, createTenantUserController } from '../controllers/tenant-user.controller';
+import {
+    getTenantUsersController,
+    createTenantUserController,
+    updateTenantUserController,
+    deleteTenantUserController
+} from '../controllers/tenant-user.controller';
 import { getDashboardStatsController, getDashboardActivitiesController } from '../controllers/dashboard.controller';
 import { requireAuth, requireSuperAdmin, requireTenantAccess } from '../middleware/auth.middleware';
-import { AppError } from '../../../domain/errors/AppError';
 
 const router = Router();
 const tenantScopedRouter = Router({ mergeParams: true });
@@ -45,18 +53,18 @@ router.patch('/:id/unblock', requireSuperAdmin, toggleTenantStatusController);
 // Branch management
 tenantScopedRouter.get('/branches', getBranchesController);
 tenantScopedRouter.get('/branches/:branchId', getBranchController);
-tenantScopedRouter.get('/branches/slug/:slug', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+tenantScopedRouter.get('/branches/slug/:slug', getBranchBySlugController);
 
 tenantAdminRouter.post('/branches', createBranchController);
-tenantAdminRouter.patch('/branches/:branchId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
-tenantAdminRouter.delete('/branches/:branchId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
-tenantAdminRouter.patch('/branches/:branchId/status', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+tenantAdminRouter.patch('/branches/:branchId', updateBranchController);
+tenantAdminRouter.delete('/branches/:branchId', deleteBranchController);
+tenantAdminRouter.patch('/branches/:branchId/status', toggleBranchStatusController);
 
 // Tenant User management
 tenantAdminRouter.get('/users', getTenantUsersController);
 tenantAdminRouter.post('/users', createTenantUserController);
-tenantAdminRouter.patch('/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
-tenantAdminRouter.delete('/users/:userId', (_req, _res, next) => next(new AppError('Feature not implemented yet', 501)));
+tenantAdminRouter.patch('/users/:userId', updateTenantUserController);
+tenantAdminRouter.delete('/users/:userId', deleteTenantUserController);
 
 // Tenant dashboard
 tenantAdminRouter.get('/dashboard/stats', getDashboardStatsController);

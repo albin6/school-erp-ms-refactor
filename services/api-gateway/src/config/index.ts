@@ -1,5 +1,9 @@
 import 'dotenv/config';
 import { z } from 'zod';
+const optionalBoolean = z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional();
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(8000),
@@ -11,6 +15,7 @@ const envSchema = z.object({
     CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173,http://sub1.localhost:5173'),
     TENANT_CACHE_TTL_SECONDS: z.coerce.number().default(30),
     INTERNAL_AUTH_SECRET: z.string().trim().min(1).optional(),
+    TRUST_TENANT_SUBDOMAIN_HEADER: optionalBoolean,
 });
 const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
@@ -18,4 +23,8 @@ if (!parsed.success) {
     console.error(parsed.error.format());
     process.exit(1);
 }
-export const config = parsed.data;
+export const config = {
+    ...parsed.data,
+    TRUST_TENANT_SUBDOMAIN_HEADER:
+        parsed.data.TRUST_TENANT_SUBDOMAIN_HEADER ?? parsed.data.NODE_ENV !== 'production',
+};

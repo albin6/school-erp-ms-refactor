@@ -9,22 +9,34 @@ interface CreateUserModalProps {
     onCancel: () => void;
     onSuccess: () => void;
     selectedBranchId?: string;
+    defaultRole?: 'STUDENT' | 'STAFF';
+    lockedRole?: 'STUDENT' | 'STAFF';
 }
 
-export const CreateUserModal: React.FC<CreateUserModalProps> = ({ open, onCancel, onSuccess, selectedBranchId }) => {
+export const CreateUserModal: React.FC<CreateUserModalProps> = ({
+    open,
+    onCancel,
+    onSuccess,
+    selectedBranchId,
+    defaultRole = 'STUDENT',
+    lockedRole,
+}) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [branches, setBranches] = useState<Branch[]>([]);
-    const [role, setRole] = useState<string>('STUDENT');
+    const [role, setRole] = useState<'STUDENT' | 'STAFF'>(lockedRole ?? defaultRole);
 
     useEffect(() => {
         if (open) {
             fetchBranches();
+            const nextRole = lockedRole ?? defaultRole;
+            setRole(nextRole);
+            form.setFieldsValue({ role: nextRole });
             if (selectedBranchId) {
                 form.setFieldsValue({ branch_id: selectedBranchId });
             }
         }
-    }, [open, selectedBranchId]);
+    }, [open, selectedBranchId, defaultRole, lockedRole, form]);
 
     const fetchBranches = async () => {
         try {
@@ -63,7 +75,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ open, onCancel
             confirmLoading={loading}
             forceRender
         >
-            <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ role: 'STUDENT', branch_id: selectedBranchId }}>
+            <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ role: lockedRole ?? defaultRole, branch_id: selectedBranchId }}>
                 { }
                 <Form.Item
                     name="name"
@@ -86,7 +98,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ open, onCancel
                     label="Role"
                     rules={[{ required: true }]}
                 >
-                    <Select onChange={setRole}>
+                    <Select onChange={setRole} disabled={!!lockedRole}>
                         <Select.Option value="STUDENT">Student</Select.Option>
                         <Select.Option value="STAFF">Staff</Select.Option>
                     </Select>

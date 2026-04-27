@@ -58,6 +58,15 @@ export class BranchRepository {
         );
         return rows[0] ?? null;
     }
+    async findBySlug(tenantId: string, slug: string): Promise<BranchRecord | null> {
+        const { rows } = await getPool().query(
+            `SELECT * FROM branches
+         WHERE tenant_id = $1
+           AND slug = $2`,
+            [tenantId, slug.toLowerCase().trim()]
+        );
+        return rows[0] ?? null;
+    }
     async create(input: {
         tenantId: string;
         name: string;
@@ -73,5 +82,61 @@ export class BranchRepository {
             [input.tenantId, input.name, input.slug, input.address ?? null, input.phone ?? null, input.email ?? null]
         );
         return rows[0];
+    }
+    async update(
+        tenantId: string,
+        branchId: string,
+        input: {
+            name?: string;
+            slug?: string;
+            address?: string | null;
+            phone?: string | null;
+            email?: string | null;
+            status?: string;
+        }
+    ): Promise<BranchRecord | null> {
+        const { rows } = await getPool().query(
+            `UPDATE branches
+            SET name = COALESCE($3, name),
+                slug = COALESCE($4, slug),
+                address = CASE WHEN $5::boolean THEN $6 ELSE address END,
+                phone = CASE WHEN $7::boolean THEN $8 ELSE phone END,
+                email = CASE WHEN $9::boolean THEN $10 ELSE email END,
+                status = COALESCE($11, status),
+                updated_at = NOW()
+          WHERE tenant_id = $1 AND id = $2
+          RETURNING *`,
+            [
+                tenantId,
+                branchId,
+                input.name,
+                input.slug,
+                Object.prototype.hasOwnProperty.call(input, 'address'),
+                input.address ?? null,
+                Object.prototype.hasOwnProperty.call(input, 'phone'),
+                input.phone ?? null,
+                Object.prototype.hasOwnProperty.call(input, 'email'),
+                input.email ?? null,
+                input.status,
+            ]
+        );
+        return rows[0] ?? null;
+    }
+    async countMemberships(tenantId: string, branchId: string): Promise<number> {
+        const { rows } = await getPool().query(
+            `SELECT COUNT(*)::int AS total
+           FROM memberships
+          WHERE tenant_id = $1 AND branch_id = $2`,
+            [tenantId, branchId]
+        );
+        return rows[0]?.total ?? 0;
+    }
+    async delete(tenantId: string, branchId: string): Promise<boolean> {
+        const result = await getPool().query(
+            `DELETE FROM branches
+          WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, branchId]
+        );
+        return (result.rowCount ?? 0) > 0;
     }
 }

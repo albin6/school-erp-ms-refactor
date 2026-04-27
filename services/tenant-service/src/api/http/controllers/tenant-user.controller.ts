@@ -35,6 +35,26 @@ const createTenantUserSchema = z.object({
         });
     }
 });
+const updateTenantUserSchema = z.object({
+    role: z.enum(['STAFF', 'STUDENT']).optional(),
+    branch_id: z.string().uuid('Invalid branch').optional(),
+    sub_role: z.enum(['PRINCIPAL', 'TEACHER', 'OFFICE_STAFF', 'OFFICE_ASSISTANT']).nullable().optional(),
+}).superRefine((data, ctx) => {
+    if (data.role === 'STAFF' && data.sub_role === null) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Staff role is required',
+            path: ['sub_role'],
+        });
+    }
+    if (data.role === 'STUDENT' && data.sub_role) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Students cannot have a staff role',
+            path: ['sub_role'],
+        });
+    }
+});
 
 export const getTenantUsersController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -241,6 +261,103 @@ export const createTenantUserController = async (req: Request, res: Response, ne
             next(new AppError('User already belongs to this tenant or branch principal already exists', 409));
             return;
         }
+        next(error);
+    }
+};
+
+export const updateTenantUserController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, userId } = req.params;
+        const body = updateTenantUserSchema.parse(req.body);
+
+        const membership = await membershipRepo.findByUserAndTenant(userId, tenantId);
+        if (!membership) {
+            throw new AppError('User does not belong to this tenant', 404);
+        }
+        if (membership.role === 'ADMIN') {
+            throw new AppError('Tenant admin membership cannot be changed from this endpoint', 400);
+        }
+
+        const nextRole = body.role ?? membership.role;
+        const nextBranchId = body.branch_id ?? membership.branchId;
+        const nextSubRole = nextRole === 'STAFF'
+            ? body.sub_role === undefined ? membership.subRole : body.sub_role
+            : null;
+
+        if (!nextBranchId) {
+            throw new AppError('Branch assignment is required', 400);
+        }
+
+        const branch = await branchRepo.findById(tenantId, nextBranchId);
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+
+        if (nextRole === 'STAFF' && !nextSubRole) {
+            throw new AppError('Staff role is required', 400);
+        }
+        if (nextRole === 'STAFF' && nextSubRole === 'PRINCIPAL') {
+            const existingPrincipal = await membershipRepo.findPrincipalByBranch(tenantId, nextBranchId);
+            if (existingPrincipal && existingPrincipal.userId !== userId) {
+                throw new AppError('A principal is already assigned to this branch', 409);
+            }
+        }
+
+        membership.updateRole(nextRole, nextSubRole, nextBranchId);
+        const updated = await membershipRepo.update(membership);
+        const [identityUser] = await batchGetUsersGrpc([updated.userId]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: updated.id,
+                user_id: updated.userId,
+                tenant_id: updated.tenantId,
+                role: updated.role,
+                sub_role: updated.subRole ?? undefined,
+                branch_id: updated.branchId ?? undefined,
+                user: identityUser
+                    ? {
+                        id: identityUser.userId,
+                        name: identityUser.name,
+                        email: identityUser.email,
+                        is_active: identityUser.isActive,
+                    }
+                    : undefined,
+                branch: {
+                    id: branch.id,
+                    name: branch.name,
+                },
+                updated_at: updated.updatedAt,
+            },
+        });
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            next(new AppError(error.errors[0].message, 400));
+            return;
+        }
+        if ((error as { code?: string })?.code === '23505') {
+            next(new AppError('User already belongs to this tenant or branch principal already exists', 409));
+            return;
+        }
+        next(error);
+    }
+};
+
+export const deleteTenantUserController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, userId } = req.params;
+        const membership = await membershipRepo.findByUserAndTenant(userId, tenantId);
+        if (!membership) {
+            throw new AppError('User does not belong to this tenant', 404);
+        }
+        if (membership.role === 'ADMIN') {
+            throw new AppError('Tenant admin membership cannot be deleted from this endpoint', 400);
+        }
+
+        await membershipRepo.deleteByUserAndTenant(userId, tenantId);
+        res.status(200).json({ success: true, message: 'User removed from tenant successfully' });
+    } catch (error) {
         next(error);
     }
 };

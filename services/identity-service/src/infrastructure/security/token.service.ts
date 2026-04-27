@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { config } from '../../config';
 import { AppError } from '../../domain/errors/AppError';
 export interface TokenPayload {
@@ -8,6 +8,7 @@ export interface TokenPayload {
     role: string;
     tenantId?: string;
     subRole?: string;
+    jti?: string;
     exp?: number;
     iat?: number;
 }
@@ -19,12 +20,12 @@ interface PasswordResetTokenPayload {
 }
 export const generateTokens = (payload: Omit<TokenPayload, 'exp' | 'iat'>) => {
     const accessToken = jwt.sign(
-        payload,
+        { ...payload, jti: randomUUID() },
         config.JWT_ACCESS_SECRET,
         { expiresIn: config.JWT_ACCESS_EXPIRES_IN as unknown as number }
     );
     const refreshToken = jwt.sign(
-        payload,
+        { ...payload, jti: randomUUID() },
         config.JWT_REFRESH_SECRET,
         { expiresIn: config.JWT_REFRESH_EXPIRES_IN as unknown as number }
     );

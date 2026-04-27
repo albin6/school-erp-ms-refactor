@@ -63,4 +63,12 @@ export class MembershipRepository implements IMembershipRepository {
         const executor = client ?? getPool();
         await executor.query(`DELETE FROM memberships WHERE id = $1`, [id]);
     }
+    async deleteByUserAndTenant(userId: string, tenantId: string, client?: PoolClient): Promise<boolean> {
+        const executor = client ?? getPool();
+        const result = await executor.query(
+            `DELETE FROM memberships WHERE user_id = $1 AND tenant_id = $2`,
+            [userId, tenantId]
+        );
+        return (result.rowCount ?? 0) > 0;
+    }
 }

@@ -12,6 +12,14 @@ const createBranchSchema = z.object({
     phone: z.string().optional(),
     email: z.string().email('Invalid email address').optional(),
 });
+const updateBranchSchema = z.object({
+    name: z.string().min(1, 'Name is required').optional(),
+    slug: z.string().min(1, 'Slug is required').regex(/^[a-z0-9-]+$/, 'Invalid slug format').optional(),
+    address: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    email: z.string().email('Invalid email address').nullable().optional(),
+    status: z.enum(['ACTIVE', 'BLOCKED']).optional(),
+});
 const branchRepo = new BranchRepository();
 const tenantRepo = new TenantRepository();
 
@@ -59,6 +67,86 @@ export const getBranchController = async (req: Request, res: Response, next: Nex
         const { branchId } = req.params;
         logger.info(`Getting branch: ${branchId}`);
         const branch = await branchRepo.findById(tenantId, branchId);
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+        res.status(200).json({ success: true, data: branch });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const updateBranchController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, branchId } = req.params;
+        const body = updateBranchSchema.parse(req.body);
+        const branch = await branchRepo.update(tenantId, branchId, {
+            name: body.name?.trim(),
+            slug: body.slug?.trim().toLowerCase(),
+            address: body.address,
+            phone: body.phone,
+            email: body.email,
+            status: body.status,
+        });
+
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+
+        res.status(200).json({ success: true, data: branch });
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            next(new AppError(error.errors[0].message, 400));
+            return;
+        }
+        if ((error as { code?: string })?.code === '23505') {
+            next(new AppError('Branch with this name or slug already exists', 409));
+            return;
+        }
+        next(error);
+    }
+};
+
+export const deleteBranchController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, branchId } = req.params;
+        const branch = await branchRepo.findById(tenantId, branchId);
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+
+        const assignedUsers = await branchRepo.countMemberships(tenantId, branchId);
+        if (assignedUsers > 0) {
+            throw new AppError('Cannot delete a branch with assigned users. Move or delete those users first.', 409);
+        }
+
+        await branchRepo.delete(tenantId, branchId);
+        res.status(200).json({ success: true, message: 'Branch deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleBranchStatusController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, branchId } = req.params;
+        const branch = await branchRepo.findById(tenantId, branchId);
+        if (!branch) {
+            throw new AppError('Branch not found', 404);
+        }
+
+        const nextStatus = branch.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+        const updated = await branchRepo.update(tenantId, branchId, { status: nextStatus });
+        res.status(200).json({ success: true, data: updated });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getBranchBySlugController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { tenantId, slug } = req.params;
+        const branch = await branchRepo.findBySlug(tenantId, slug);
         if (!branch) {
             throw new AppError('Branch not found', 404);
         }

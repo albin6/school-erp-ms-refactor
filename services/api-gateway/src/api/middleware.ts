@@ -22,6 +22,9 @@ const normalizeTenantSubdomain = (value: string | undefined): string | null => {
     return /^[a-z0-9-]+$/.test(candidate) ? candidate : null;
 };
 
+const getHeaderValue = (value: string | string[] | undefined): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+
 export const gatewayMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const correlationId = (req.headers['x-correlation-id'] as string) || uuidv4();
@@ -30,11 +33,14 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
         
         const host = req.headers.host || '';
         const subdomainMatches = host.match(/^([a-z0-9-]+)\.localhost/);
-        const headerSubdomain = Array.isArray(req.headers['x-tenant-subdomain'])
-            ? req.headers['x-tenant-subdomain'][0]
-            : req.headers['x-tenant-subdomain'];
+        const headerSubdomain = config.TRUST_TENANT_SUBDOMAIN_HEADER
+            ? getHeaderValue(req.headers['x-tenant-subdomain'])
+            : undefined;
         let tenantId = '';
         const subdomain = normalizeTenantSubdomain(subdomainMatches?.[1] ?? headerSubdomain);
+        if (!config.TRUST_TENANT_SUBDOMAIN_HEADER && req.headers['x-tenant-subdomain'] && !subdomainMatches?.[1]) {
+            logger.warn(`[${correlationId}] Ignoring untrusted x-tenant-subdomain header`, { correlationId });
+        }
         if (subdomain) {
             logger.info(`[${correlationId}] Resolving subdomain: ${subdomain}`, { correlationId });
             try {

@@ -61,9 +61,11 @@ const rotateRefreshToken = async (
 ): Promise<{ accessToken: string; refreshToken: string }> => {
     const client = await getPool().connect();
     const refreshTokenHash = hashRefreshToken(refreshToken);
+    let transactionOpen = false;
 
     try {
         await client.query('BEGIN');
+        transactionOpen = true;
 
         const { rows } = await client.query<RefreshTokenRow>(
             `SELECT id, user_id, family_id, expires_at, revoked_at
@@ -87,6 +89,8 @@ const rotateRefreshToken = async (
                   WHERE family_id = $1`,
                 [tokenRow.family_id]
             );
+            await client.query('COMMIT');
+            transactionOpen = false;
             throw new AppError('Invalid or expired refresh token', 401);
         }
 
@@ -113,9 +117,12 @@ const rotateRefreshToken = async (
         );
 
         await client.query('COMMIT');
+        transactionOpen = false;
         return nextTokens;
     } catch (error) {
-        await client.query('ROLLBACK');
+        if (transactionOpen) {
+            await client.query('ROLLBACK');
+        }
         throw error;
     } finally {
         client.release();

@@ -1,4 +1,5 @@
 import { Kafka, Consumer, logLevel } from 'kafkajs';
+import { z } from 'zod';
 import { config } from '../../config';
 import { logger } from '../../config/logger';
 import { AuditLogRepository } from '../database/AuditLogRepository';
@@ -73,6 +74,13 @@ const getRetryDelayMs = (attempt: number): number =>
     Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.max(1, attempt));
 
 const getNextOffset = (offset: string): string => (BigInt(offset) + 1n).toString();
+const eventEnvelopeSchema = z.object({
+    eventId: z.string().min(1),
+    eventType: z.string().min(1).optional(),
+    aggregateId: z.string().min(1).optional(),
+    occurredAt: z.string().datetime().optional(),
+    payload: z.record(z.any()).default({}),
+});
 
 const scheduleReconnect = (reason: string, error?: string) => {
     if (shutdownRequested || retryTimer || connectPromise || consumer) return;
@@ -125,21 +133,38 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                             await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
-                        const event = JSON.parse(valueStr);
-
-                        if (typeof event?.eventId !== 'string' || !event.eventId.trim()) {
-                            logger.warn(`[Audit] Skipping message on ${topic} without a valid eventId`);
+                        let parsed: unknown;
+                        try {
+                            parsed = JSON.parse(valueStr);
+                        } catch (parseError: any) {
+                            logger.warn(`[Audit] Skipping invalid JSON message on ${topic}`, {
+                                partition,
+                                offset: message.offset,
+                                error: parseError.message,
+                            });
                             await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
 
+                        const eventResult = eventEnvelopeSchema.safeParse(parsed);
+                        if (!eventResult.success) {
+                            logger.warn(`[Audit] Skipping invalid event envelope on ${topic}`, {
+                                partition,
+                                offset: message.offset,
+                                issues: eventResult.error.issues,
+                            });
+                            await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
+                            return;
+                        }
+
+                        const event = eventResult.data;
                         const correlationId = message.headers?.['correlation-id']?.toString() || 'system';
                         const inserted = await repo.recordEvent(
                             event.eventId,
-                            event.eventType || topic,
-                            event.aggregateId || 'unknown',
-                            event.occurredAt || new Date().toISOString(),
-                            event.payload || {},
+                            event.eventType ?? topic,
+                            event.aggregateId ?? 'unknown',
+                            event.occurredAt ?? new Date().toISOString(),
+                            event.payload,
                             correlationId
                         );
                         if (!inserted) {
