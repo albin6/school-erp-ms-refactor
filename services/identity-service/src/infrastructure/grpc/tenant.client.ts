@@ -40,6 +40,7 @@ export interface MembershipInfo {
     role?: 'ADMIN' | 'STAFF' | 'STUDENT';
     subRole?: string;
     branchId?: string;
+    authzVersion?: number;
 }
 
 const shouldRetryGrpcError = (error: any): boolean => {
@@ -112,6 +113,7 @@ const callGetMembership = (userId: string, tenantId: string): Promise<Membership
                 role: response.role,
                 subRole: response.sub_role,
                 branchId: response.branch_id,
+                authzVersion: Number(response.authz_version ?? 0),
             });
         });
     });

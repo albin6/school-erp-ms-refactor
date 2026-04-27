@@ -37,10 +37,12 @@ export const createTenantController = async (req: Request, res: Response, next: 
             createdBy: userId,
             correlationId,
         });
-        res.status(201).json({
+        res.status(result.status === 'PROVISIONING' ? 202 : 201).json({
             success: true,
-            data: { tenantId: result.tenantId },
-            message: 'Tenant provisioned successfully. Background setup initiated.',
+            data: { tenantId: result.tenantId, status: result.status },
+            message: result.status === 'PROVISIONING'
+                ? 'Tenant provisioning accepted. Background setup initiated.'
+                : 'Tenant provisioned successfully.',
         });
     } catch (error) {
         if (error instanceof z.ZodError) {

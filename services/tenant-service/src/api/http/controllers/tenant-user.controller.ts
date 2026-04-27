@@ -8,10 +8,20 @@ import { MembershipRepository } from '../../../infrastructure/database/Membershi
 import { BranchRepository } from '../../../infrastructure/database/BranchRepository';
 import { TenantRepository } from '../../../infrastructure/database/TenantRepository';
 import { batchGetUsersGrpc, createUserGrpc } from '../../../infrastructure/grpc/identity.client';
+import { UserSnapshotRepository } from '../../../infrastructure/database/UserSnapshotRepository';
+import { config } from '../../../config';
 
 const membershipRepo = new MembershipRepository();
 const branchRepo = new BranchRepository();
 const tenantRepo = new TenantRepository();
+const userSnapshotRepo = new UserSnapshotRepository();
+
+interface TenantUserDisplayProfile {
+    userId: string;
+    email: string;
+    name: string;
+    isActive: boolean;
+}
 
 const createTenantUserSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -121,8 +131,27 @@ export const getTenantUsersController = async (req: Request, res: Response, next
             getPool().query(listQuery, values),
         ]);
 
-        const identityUsers = await batchGetUsersGrpc(rows.map((row) => row.user_id));
-        const identityUserById = new Map(identityUsers.map((user) => [user.userId, user]));
+        const userIds = rows.map((row) => row.user_id);
+        const snapshots = await userSnapshotRepo.findByUserIds(userIds);
+        const identityUserById = new Map<string, TenantUserDisplayProfile>(
+            snapshots.map((user) => [user.userId, user])
+        );
+        const missingUserIds = userIds.filter((userId) => !identityUserById.has(userId));
+
+        if (missingUserIds.length > 0 && config.TENANT_USER_LIST_IDENTITY_FALLBACK) {
+            const identityUsers = await batchGetUsersGrpc(missingUserIds);
+            for (const user of identityUsers) {
+                identityUserById.set(user.userId, user);
+                await userSnapshotRepo.upsert({
+                    userId: user.userId,
+                    email: user.email,
+                    name: user.name,
+                    isActive: user.isActive,
+                    mustResetPassword: user.mustResetPassword,
+                });
+            }
+        }
+
         const users = rows
             .map((row) => {
                 const user = identityUserById.get(row.user_id);
@@ -215,6 +244,13 @@ export const createTenantUserController = async (req: Request, res: Response, ne
             true,
             correlationId
         );
+        await userSnapshotRepo.upsert({
+            userId: createdUser.userId,
+            email: body.email,
+            name: body.name,
+            isActive: true,
+            mustResetPassword: true,
+        });
 
         const existingMembership = await membershipRepo.findByUserAndTenant(createdUser.userId, tenantId);
         if (existingMembership) {

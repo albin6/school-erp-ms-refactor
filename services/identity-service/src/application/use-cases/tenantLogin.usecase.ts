@@ -121,8 +121,11 @@ export const tenantLoginUseCase = async (cmd: TenantLoginCommand): Promise<Tenan
         userId: user.id,
         email: user.email,
         role: membership.role!,
+        tenantRole: membership.role!,
         tenantId: tenant.tenantId,
         subRole: membership.subRole || undefined,
+        tenantSubRole: membership.subRole || undefined,
+        authzVersion: membership.authzVersion,
     });
     const refreshTokenHash = hashRefreshToken(refreshToken);
     const familyId = uuidv4();

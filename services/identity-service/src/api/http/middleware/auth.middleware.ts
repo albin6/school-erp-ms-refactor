@@ -31,7 +31,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 
 export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as any).user;
-    if (!user || user.role !== 'SUPER_ADMIN') {
+    if (!user || (user.platformRole ?? user.role) !== 'SUPER_ADMIN') {
         next(new AppError('Forbidden: Super Admin access required', 403));
         return;
     }

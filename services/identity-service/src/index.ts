@@ -9,6 +9,7 @@ import { runSeed } from './infrastructure/database/seed';
 import { connectRedis, closeRedis } from './infrastructure/cache/redis.client';
 import { connectProducer, disconnectProducer } from './infrastructure/messaging/kafka.producer';
 import { startOutboxWorker, stopOutboxWorker } from './infrastructure/messaging/outbox.worker';
+import { connectConsumer, disconnectConsumer } from './infrastructure/messaging/kafka.consumer';
 const start = async () => {
     try {
         logger.info('Starting Identity Service...');
@@ -17,6 +18,7 @@ const start = async () => {
         await runSeed();
         await connectRedis();
         await connectProducer();
+        void connectConsumer();
         const app = createHttpServer();
         const server = app.listen(config.HTTP_PORT, () => {
             logger.info(` HTTP REST server listening on port ${config.HTTP_PORT}`);
@@ -40,6 +42,7 @@ const start = async () => {
             server.close(() => logger.info('HTTP server closed'));
             grpcServer.forceShutdown();
             await disconnectProducer();
+            await disconnectConsumer();
             await closeRedis();
             await closeDB();
             logger.info('Graceful shutdown complete. Exiting.');

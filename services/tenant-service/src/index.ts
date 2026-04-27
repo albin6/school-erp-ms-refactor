@@ -7,18 +7,16 @@ import { connectDB, closeDB } from './infrastructure/database/db';
 import { runMigrations } from './infrastructure/database/migrate';
 import { connectProducer, disconnectProducer } from './infrastructure/messaging/kafka.producer';
 import { startOutboxWorker, stopOutboxWorker } from './infrastructure/messaging/outbox.worker';
+import { connectConsumer, disconnectConsumer } from './infrastructure/messaging/kafka.consumer';
 const start = async () => {
     try {
         logger.info('Starting Tenant Service...');
-        if (config.INTERNAL_AUTH_SECRET) {
-            logger.info('INTERNAL_AUTH_SECRET configured; tenant-service will trust gateway-provided auth headers when the secret matches.');
-        } else {
-            logger.warn('INTERNAL_AUTH_SECRET is not configured; falling back to Identity Service gRPC token validation for every authenticated request.');
-        }
+        logger.info('INTERNAL_AUTH_SIGNING_SECRET configured; tenant-service will verify signed gateway auth tokens and fall back to bearer validation during rollout.');
         await connectDB();
         await runMigrations();
         logger.warn('Kafka producer initialization is running in the background; tenant event publishing will stay degraded until the broker becomes reachable.');
         void connectProducer();
+        void connectConsumer();
         const app = createHttpServer();
         const server = app.listen(config.HTTP_PORT, () => {
             logger.info(` HTTP REST server listening on port ${config.HTTP_PORT}`);
@@ -42,6 +40,7 @@ const start = async () => {
             server.close(() => logger.info('HTTP server closed'));
             grpcServer.forceShutdown();
             await disconnectProducer();
+            await disconnectConsumer();
             await closeDB();
             logger.info('Graceful shutdown complete. Exiting.');
             process.exit(0);

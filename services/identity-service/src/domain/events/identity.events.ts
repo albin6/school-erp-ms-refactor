@@ -4,6 +4,9 @@ export interface DomainEvent {
     aggregateId: string;
     occurredAt: string;
     correlationId?: string;
+    causationId?: string;
+    eventVersion?: number;
+    aggregateType?: string;
     payload?: unknown;
 }
 export interface UserCreatedEvent extends DomainEvent {

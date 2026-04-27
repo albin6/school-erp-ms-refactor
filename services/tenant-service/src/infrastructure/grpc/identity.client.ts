@@ -24,6 +24,9 @@ export interface TokenValidationResult {
     role: string;
     tenantId: string;
     subRole: string;
+    platformRole: string;
+    tenantRole: string;
+    authzVersion: number;
 }
 
 export interface CreateUserResult {
@@ -65,6 +68,9 @@ const callValidateToken = (token: string): Promise<TokenValidationResult> => {
                 role: response.role,
                 tenantId: response.tenant_id,
                 subRole: response.sub_role,
+                platformRole: response.platform_role,
+                tenantRole: response.tenant_role,
+                authzVersion: Number(response.authz_version ?? 0),
             });
         });
     });

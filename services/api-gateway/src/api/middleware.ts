@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger';
 import { getCachedJson, setCachedJson } from '../infrastructure/cache/redis.client';
 import { config } from '../config';
+import { signInternalAuthToken } from '../infrastructure/security/internal-token.service';
 
 interface CachedTenantContext {
     found: boolean;
@@ -25,8 +26,26 @@ const normalizeTenantSubdomain = (value: string | undefined): string | null => {
 const getHeaderValue = (value: string | string[] | undefined): string | undefined =>
     Array.isArray(value) ? value[0] : value;
 
+const spoofableIdentityHeaders = [
+    'x-user-id',
+    'x-user-email',
+    'x-user-role',
+    'x-user-subrole',
+    'x-tenant-id',
+    'x-auth-validated',
+    'x-internal-auth-secret',
+    'x-internal-auth-token',
+];
+
+const stripSpoofableIdentityHeaders = (req: Request): void => {
+    for (const headerName of spoofableIdentityHeaders) {
+        delete req.headers[headerName];
+    }
+};
+
 export const gatewayMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        stripSpoofableIdentityHeaders(req);
         const correlationId = (req.headers['x-correlation-id'] as string) || uuidv4();
         req.headers['x-correlation-id'] = correlationId;
         logger.info(`[${correlationId}] Incoming ${req.method} ${req.path}`, { correlationId });
@@ -70,19 +89,23 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
             logger.info(`[${correlationId}] Validating token`, { correlationId });
             try {
                 const payload = await validateToken(token);
-                req.headers['x-user-id'] = payload.userId;
-                req.headers['x-user-email'] = payload.email;
-                req.headers['x-user-role'] = payload.role;
-                req.headers['x-user-subrole'] = payload.subRole;
-                if (config.INTERNAL_AUTH_SECRET) {
-                    req.headers['x-auth-validated'] = 'true';
-                    req.headers['x-internal-auth-secret'] = config.INTERNAL_AUTH_SECRET;
-                }
-                if (tenantId && payload.tenantId && tenantId !== payload.tenantId && payload.role !== 'SUPER_ADMIN') {
+                const effectiveRole = payload.platformRole || payload.role;
+                if (tenantId && payload.tenantId && tenantId !== payload.tenantId && effectiveRole !== 'SUPER_ADMIN') {
                     logger.warn(`[${correlationId}] Token tenant mismatch`, { correlationId });
                     res.status(403).json({ success: false, error: 'Token does not match tenant context' });
                     return;
                 }
+                req.headers['x-internal-auth-token'] = signInternalAuthToken({
+                    userId: payload.userId,
+                    email: payload.email,
+                    role: payload.role,
+                    platformRole: payload.platformRole || undefined,
+                    tenantId: payload.tenantId || tenantId || undefined,
+                    tenantRole: payload.tenantRole || undefined,
+                    subRole: payload.subRole || undefined,
+                    authzVersion: payload.authzVersion || undefined,
+                    correlationId,
+                });
             } catch (err) {
                 logger.error(`[${correlationId}] Token validation error:`, err, { correlationId });
                 res.status(401).json({ success: false, error: 'Invalid authentication token' });

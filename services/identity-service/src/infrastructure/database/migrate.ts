@@ -52,16 +52,38 @@ export const runMigrations = async (): Promise<void> => {
       aggregate_type VARCHAR(100) NOT NULL,
       aggregate_id UUID NOT NULL,
       event_type VARCHAR(100) NOT NULL,
+      event_version INT NOT NULL DEFAULT 1,
+      correlation_id VARCHAR(255),
+      causation_id VARCHAR(255),
       payload JSONB NOT NULL,
       claimed_at TIMESTAMPTZ,
       processed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+    ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS event_version INT NOT NULL DEFAULT 1;
+    ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(255);
+    ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS causation_id VARCHAR(255);
     CREATE INDEX IF NOT EXISTS idx_identity_outbox_unprocessed
       ON outbox_events(processed_at) WHERE processed_at IS NULL;
     CREATE INDEX IF NOT EXISTS idx_identity_outbox_claimed
       ON outbox_events(claimed_at) WHERE processed_at IS NULL;
+    CREATE TABLE IF NOT EXISTS processed_events (
+      event_id UUID PRIMARY KEY,
+      event_type VARCHAR(255) NOT NULL,
+      processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS failed_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_id UUID,
+      event_type VARCHAR(255),
+      topic VARCHAR(255) NOT NULL,
+      payload JSONB NOT NULL,
+      error_message TEXT NOT NULL,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
     logger.info(' identity-db migrations complete');
 };

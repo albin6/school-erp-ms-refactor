@@ -37,9 +37,12 @@ const handlers = {
                 valid: true,
                 user_id: payload.userId,
                 email: payload.email,
-                role: payload.role,
+                role: payload.role ?? payload.platformRole ?? payload.tenantRole ?? '',
                 tenant_id: payload.tenantId ?? '',
-                sub_role: payload.subRole ?? '',
+                sub_role: payload.subRole ?? payload.tenantSubRole ?? '',
+                platform_role: payload.platformRole ?? '',
+                tenant_role: payload.tenantRole ?? '',
+                authz_version: payload.authzVersion ?? 0,
                 error: '',
             });
         } catch (error: any) {

@@ -19,6 +19,9 @@ message ValidateTokenResponse {
   string tenant_id = 5;
   string sub_role = 6;
   string error = 7;
+  string platform_role = 8;
+  string tenant_role = 9;
+  int64 authz_version = 10;
 }
 message GetUserByIdRequest {
   string user_id = 1;

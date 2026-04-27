@@ -11,6 +11,7 @@ export class MembershipRepository implements IMembershipRepository {
             branchId: row.branch_id,
             role: row.role,
             subRole: row.sub_role,
+            authzVersion: Number(row.authz_version ?? 1),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         });
@@ -38,12 +39,12 @@ export class MembershipRepository implements IMembershipRepository {
         const executor = client ?? getPool();
         const { rows } = await executor.query(
             `INSERT INTO memberships (
-        id, user_id, tenant_id, branch_id, role, sub_role, created_at, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        id, user_id, tenant_id, branch_id, role, sub_role, authz_version, created_at, updated_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *`,
             [
                 membership.id, membership.userId, membership.tenantId, membership.branchId,
-                membership.role, membership.subRole, membership.createdAt, membership.updatedAt
+                membership.role, membership.subRole, membership.authzVersion, membership.createdAt, membership.updatedAt
             ]
         );
         return this.toAggregate(rows[0]);
@@ -52,11 +53,22 @@ export class MembershipRepository implements IMembershipRepository {
         const executor = client ?? getPool();
         const { rows } = await executor.query(
             `UPDATE memberships SET
-        role = $2, sub_role = $3, branch_id = $4, updated_at = $5
-      WHERE id = $1
+        role = $2, sub_role = $3, branch_id = $4, authz_version = $5, updated_at = $6
+      WHERE id = $1 AND tenant_id = $7
       RETURNING *`,
-            [membership.id, membership.role, membership.subRole, membership.branchId, new Date()]
+            [
+                membership.id,
+                membership.role,
+                membership.subRole,
+                membership.branchId,
+                membership.authzVersion,
+                new Date(),
+                membership.tenantId,
+            ]
         );
+        if (!rows[0]) {
+            throw new Error('Membership not found for tenant-scoped update');
+        }
         return this.toAggregate(rows[0]);
     }
     async delete(id: string, client?: PoolClient): Promise<void> {

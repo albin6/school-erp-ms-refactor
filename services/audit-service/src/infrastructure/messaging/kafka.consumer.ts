@@ -1,10 +1,12 @@
-import { Kafka, Consumer, logLevel } from 'kafkajs';
+import { Kafka, Consumer, Producer, Partitioners, logLevel } from 'kafkajs';
 import { z } from 'zod';
 import { config } from '../../config';
 import { logger } from '../../config/logger';
 import { AuditLogRepository } from '../database/AuditLogRepository';
 import { markKafkaConsumerConnected, markKafkaConsumerDisconnected, markKafkaMetadataVerified } from './kafka.readiness';
+import { EventProcessingRepository } from '../database/EventProcessingRepository';
 let consumer: Consumer | null = null;
+let dlqProducer: Producer | null = null;
 let connectPromise: Promise<void> | null = null;
 let retryTimer: NodeJS.Timeout | null = null;
 let retryAttempt = 0;
@@ -14,11 +16,41 @@ const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 30000;
 
 const repo = new AuditLogRepository();
+const eventRepo = new EventProcessingRepository();
 const kafka = new Kafka({
     clientId: config.KAFKA_CLIENT_ID,
     brokers: config.KAFKA_BROKERS.split(','),
     logLevel: logLevel.WARN,
 });
+const getDlqProducer = async (): Promise<Producer> => {
+    if (!dlqProducer) {
+        dlqProducer = kafka.producer({
+            createPartitioner: Partitioners.LegacyPartitioner,
+            allowAutoTopicCreation: true,
+        });
+        await dlqProducer.connect();
+    }
+    return dlqProducer;
+};
+
+const publishDlq = async (topic: string, event: any, error: unknown): Promise<void> => {
+    const producer = await getDlqProducer();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await producer.send({
+        topic: `${topic}.dlq`,
+        messages: [{
+            key: event?.aggregateId ?? event?.eventId ?? topic,
+            value: JSON.stringify({
+                ...event,
+                dlq: {
+                    sourceTopic: topic,
+                    errorMessage,
+                    failedAt: new Date().toISOString(),
+                },
+            }),
+        }],
+    });
+};
 const refreshKafkaReadiness = async (reason: string): Promise<void> => {
     const admin = kafka.admin();
     try {
@@ -142,6 +174,12 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                                 offset: message.offset,
                                 error: parseError.message,
                             });
+                            await eventRepo.recordFailure({
+                                topic,
+                                payload: { raw: valueStr },
+                                errorMessage: parseError.message,
+                            });
+                            await publishDlq(topic, { raw: valueStr }, parseError);
                             await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
@@ -153,15 +191,29 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                                 offset: message.offset,
                                 issues: eventResult.error.issues,
                             });
+                            await eventRepo.recordFailure({
+                                eventId: typeof (parsed as any)?.eventId === 'string' ? (parsed as any).eventId : undefined,
+                                eventType: typeof (parsed as any)?.eventType === 'string' ? (parsed as any).eventType : topic,
+                                topic,
+                                payload: parsed,
+                                errorMessage: eventResult.error.message,
+                            });
+                            await publishDlq(topic, parsed, eventResult.error);
                             await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
 
                         const event = eventResult.data;
+                        const eventType = event.eventType ?? topic;
+                        if (await eventRepo.hasProcessed(event.eventId)) {
+                            logger.info(`[Audit] Skipping duplicate processed event ${event.eventId} on ${topic}`);
+                            await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
+                            return;
+                        }
                         const correlationId = message.headers?.['correlation-id']?.toString() || 'system';
                         const inserted = await repo.recordEvent(
                             event.eventId,
-                            event.eventType ?? topic,
+                            eventType,
                             event.aggregateId ?? 'unknown',
                             event.occurredAt ?? new Date().toISOString(),
                             event.payload,
@@ -169,10 +221,12 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                         );
                         if (!inserted) {
                             logger.info(`[Audit] Skipping duplicate event ${event.eventId} on ${topic}`);
+                            await eventRepo.markProcessed(event.eventId, eventType);
                             await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                             return;
                         }
 
+                        await eventRepo.markProcessed(event.eventId, eventType);
                         await nextConsumer.commitOffsets([{ topic, partition, offset: nextOffset }]);
                         logger.debug(`[Audit] Recorded ${event.eventType} on ${topic}`);
                     } catch (err: any) {
@@ -181,6 +235,20 @@ export const connectConsumer = async (reason = 'startup'): Promise<void> => {
                             offset: message.offset,
                             error: err.stack,
                         });
+                        let parsedEvent: any = {};
+                        try {
+                            parsedEvent = message.value ? JSON.parse(message.value.toString()) : {};
+                        } catch {
+                            parsedEvent = {};
+                        }
+                        await eventRepo.recordFailure({
+                            eventId: parsedEvent?.eventId,
+                            eventType: parsedEvent?.eventType ?? topic,
+                            topic,
+                            payload: parsedEvent,
+                            errorMessage: err instanceof Error ? err.message : String(err),
+                        });
+                        await publishDlq(topic, parsedEvent, err);
                         throw err;
                     }
                 },
@@ -229,5 +297,9 @@ export const disconnectConsumer = async (): Promise<void> => {
         await currentConsumer.disconnect();
         markKafkaConsumerDisconnected('Kafka consumer disconnected');
         logger.info('Kafka consumer disconnected');
+    }
+    if (dlqProducer) {
+        await dlqProducer.disconnect();
+        dlqProducer = null;
     }
 };

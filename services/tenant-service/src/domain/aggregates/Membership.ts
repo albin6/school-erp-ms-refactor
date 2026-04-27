@@ -9,6 +9,7 @@ export interface MembershipProps {
     branchId?: string | null;
     role: Role;
     subRole?: SubRole | null;
+    authzVersion?: number;
     createdAt?: Date;
     updatedAt?: Date;
 }
@@ -19,6 +20,7 @@ export class Membership {
     public branchId: string | null;
     public role: Role;
     public subRole: SubRole | null;
+    public authzVersion: number;
     public readonly createdAt: Date;
     public updatedAt: Date;
     constructor(props: MembershipProps) {
@@ -28,6 +30,7 @@ export class Membership {
         this.branchId = props.branchId ?? null;
         this.role = props.role;
         this.subRole = props.subRole ?? null;
+        this.authzVersion = props.authzVersion ?? 1;
         this.createdAt = props.createdAt ?? new Date();
         this.updatedAt = props.updatedAt ?? new Date();
         this.validate();
@@ -46,6 +49,7 @@ export class Membership {
         this.role = role;
         this.subRole = subRole ?? null;
         this.branchId = branchId ?? null;
+        this.authzVersion += 1;
         this.updatedAt = new Date();
         this.validate();
     }

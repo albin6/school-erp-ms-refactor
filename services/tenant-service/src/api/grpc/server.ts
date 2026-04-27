@@ -71,6 +71,7 @@ const handlers = {
                 role: membership.role,
                 sub_role: membership.subRole ?? '',
                 branch_id: membership.branchId ?? '',
+                authz_version: membership.authzVersion,
             });
         } catch (error: any) {
             logger.error('gRPC GetMembership error', { error: error.message });

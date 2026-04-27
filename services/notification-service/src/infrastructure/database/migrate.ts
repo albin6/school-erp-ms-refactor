@@ -36,6 +36,22 @@ export const runMigrations = async (): Promise<void> => {
       sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_sent_notifications_event_id ON sent_notifications(event_id);
+    CREATE TABLE IF NOT EXISTS processed_events (
+      event_id UUID PRIMARY KEY,
+      event_type VARCHAR(255) NOT NULL,
+      processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS failed_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      event_id UUID,
+      event_type VARCHAR(255),
+      topic VARCHAR(255) NOT NULL,
+      payload JSONB NOT NULL,
+      error_message TEXT NOT NULL,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
     logger.info(' notification-db migrations complete');
 };

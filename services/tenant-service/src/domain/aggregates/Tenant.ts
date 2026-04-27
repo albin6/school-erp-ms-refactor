@@ -47,6 +47,11 @@ export class Tenant {
         this.settings = { ...this.settings, ...newSettings };
         this.updatedAt = new Date();
     }
+    markProvisioning(): void {
+        this.status = 'PROVISIONING';
+        this.isActive = false;
+        this.updatedAt = new Date();
+    }
     suspend(): void {
         if (this.status === 'SUSPENDED') throw new AppError('Tenant is already suspended', 400);
         this.status = 'SUSPENDED';
@@ -54,10 +59,13 @@ export class Tenant {
         this.updatedAt = new Date();
     }
     activate(): void {
-        if (this.status === 'ACTIVE') throw new AppError('Tenant is already active', 400);
         this.status = 'ACTIVE';
         this.isActive = true;
         this.updatedAt = new Date();
+        this.updateSettings({
+            provisioningError: null,
+            activatedAt: new Date().toISOString(),
+        });
     }
     failProvisioning(reason: string): void {
         this.status = 'FAILED';

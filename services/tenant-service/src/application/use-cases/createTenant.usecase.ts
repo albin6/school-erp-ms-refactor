@@ -8,6 +8,7 @@ import { AppError } from '../../domain/errors/AppError';
 import { Membership } from '../../domain/aggregates/Membership';
 import { createUserGrpc } from '../../infrastructure/grpc/identity.client';
 import { logger } from '../../config/logger';
+import { config } from '../../config';
 export interface CreateTenantCommand {
     name: string;
     subdomain: string;
@@ -18,6 +19,7 @@ export interface CreateTenantCommand {
 }
 export interface CreateTenantResult {
     tenantId: string;
+    status: string;
 }
 const tenantRepo = new TenantRepository();
 const membershipRepo = new MembershipRepository();
@@ -35,6 +37,43 @@ export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<Cre
         status: 'PROVISIONING',
         isActive: false,
     });
+
+    if (config.ASYNC_TENANT_PROVISIONING) {
+        await withTransaction(async (client) => {
+            await tenantRepo.save(tenant, client);
+            await client.query(
+                `INSERT INTO tenant_provisioning_steps (tenant_id, step, status, attempts, idempotency_key)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (tenant_id, step) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    attempts = tenant_provisioning_steps.attempts + 1,
+                    updated_at = NOW()`,
+                [tenant.id, 'ADMIN_USER', 'PENDING', 1, `tenant-admin:${tenant.id}:${cmd.adminEmail.toLowerCase().trim()}`]
+            );
+            await insertOutboxEvent(
+                client,
+                {
+                    eventId: uuidv4(),
+                    eventType: 'tenant.provisioning.requested',
+                    aggregateId: tenant.id,
+                    occurredAt: new Date().toISOString(),
+                    correlationId: cmd.correlationId,
+                    payload: {
+                        tenantId: tenant.id,
+                        name: tenant.name,
+                        subdomain: tenant.subdomain,
+                        domain: tenant.domain,
+                        adminEmail: cmd.adminEmail,
+                        createdBy: tenant.createdBy,
+                        idempotencyKey: `tenant-admin:${tenant.id}:${cmd.adminEmail.toLowerCase().trim()}`,
+                    },
+                },
+                'Tenant'
+            );
+        });
+        return { tenantId: tenant.id, status: tenant.status };
+    }
+
     await withTransaction(async (client) => {
         await tenantRepo.save(tenant, client);
     });
@@ -96,5 +135,5 @@ export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<Cre
         throw error;
     }
 
-    return { tenantId: tenant.id };
+    return { tenantId: tenant.id, status: tenant.status };
 };

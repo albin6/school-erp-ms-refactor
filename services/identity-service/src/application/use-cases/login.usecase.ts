@@ -68,7 +68,12 @@ export const loginUseCase = async (cmd: LoginCommand): Promise<LoginResult> => {
     }
     user.recordSuccessfulLogin();
     const role = user.isSuperAdmin ? 'SUPER_ADMIN' : 'USER';
-    const { accessToken, refreshToken } = generateTokens({ userId: user.id, email: user.email, role });
+    const { accessToken, refreshToken } = generateTokens({
+        userId: user.id,
+        email: user.email,
+        role,
+        platformRole: user.isSuperAdmin ? 'SUPER_ADMIN' : undefined,
+    });
     const refreshTokenHash = hashRefreshToken(refreshToken);
     const familyId = uuidv4();
     const expiresAt = new Date(Date.now() + ms(config.JWT_REFRESH_EXPIRES_IN as string));

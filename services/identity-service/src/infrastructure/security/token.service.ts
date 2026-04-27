@@ -5,12 +5,18 @@ import { AppError } from '../../domain/errors/AppError';
 export interface TokenPayload {
     userId: string;
     email: string;
-    role: string;
+    role?: string;
+    platformRole?: 'SUPER_ADMIN';
     tenantId?: string;
+    tenantRole?: 'ADMIN' | 'STAFF' | 'STUDENT';
     subRole?: string;
+    tenantSubRole?: string;
+    authzVersion?: number;
     jti?: string;
     exp?: number;
     iat?: number;
+    iss?: string;
+    aud?: string;
 }
 interface PasswordResetTokenPayload {
     email: string;
@@ -19,15 +25,38 @@ interface PasswordResetTokenPayload {
     iat?: number;
 }
 export const generateTokens = (payload: Omit<TokenPayload, 'exp' | 'iat'>) => {
+    const platformRole = payload.platformRole ?? (payload.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : undefined);
+    const tenantRole = payload.tenantRole ?? (
+        payload.role === 'ADMIN' || payload.role === 'STAFF' || payload.role === 'STUDENT'
+            ? payload.role
+            : undefined
+    );
+    const compatibilityRole = payload.role ?? platformRole ?? tenantRole;
+    const normalizedPayload: Omit<TokenPayload, 'exp' | 'iat'> = {
+        ...payload,
+        role: compatibilityRole,
+        platformRole,
+        tenantRole,
+        subRole: payload.subRole ?? payload.tenantSubRole,
+        tenantSubRole: payload.tenantSubRole ?? payload.subRole,
+    };
     const accessToken = jwt.sign(
-        { ...payload, jti: randomUUID() },
+        { ...normalizedPayload, jti: randomUUID() },
         config.JWT_ACCESS_SECRET,
-        { expiresIn: config.JWT_ACCESS_EXPIRES_IN as unknown as number }
+        {
+            expiresIn: config.JWT_ACCESS_EXPIRES_IN as unknown as number,
+            issuer: 'identity-service',
+            audience: 'school-erp-api',
+        }
     );
     const refreshToken = jwt.sign(
-        { ...payload, jti: randomUUID() },
+        { ...normalizedPayload, jti: randomUUID() },
         config.JWT_REFRESH_SECRET,
-        { expiresIn: config.JWT_REFRESH_EXPIRES_IN as unknown as number }
+        {
+            expiresIn: config.JWT_REFRESH_EXPIRES_IN as unknown as number,
+            issuer: 'identity-service',
+            audience: 'school-erp-api',
+        }
     );
     return { accessToken, refreshToken };
 };
@@ -43,9 +72,16 @@ export const generatePasswordResetToken = (email: string): string => {
 };
 export const verifyAccessToken = (token: string): TokenPayload => {
     try {
-        return jwt.verify(token, config.JWT_ACCESS_SECRET) as TokenPayload;
+        return jwt.verify(token, config.JWT_ACCESS_SECRET, {
+            issuer: 'identity-service',
+            audience: 'school-erp-api',
+        }) as TokenPayload;
     } catch {
-        throw new AppError('Invalid or expired access token', 401);
+        try {
+            return jwt.verify(token, config.JWT_ACCESS_SECRET) as TokenPayload;
+        } catch {
+            throw new AppError('Invalid or expired access token', 401);
+        }
     }
 };
 export const verifyPasswordResetToken = (token: string): PasswordResetTokenPayload => {
@@ -61,9 +97,16 @@ export const verifyPasswordResetToken = (token: string): PasswordResetTokenPaylo
 };
 export const verifyRefreshToken = (token: string): TokenPayload => {
     try {
-        return jwt.verify(token, config.JWT_REFRESH_SECRET) as TokenPayload;
+        return jwt.verify(token, config.JWT_REFRESH_SECRET, {
+            issuer: 'identity-service',
+            audience: 'school-erp-api',
+        }) as TokenPayload;
     } catch {
-        throw new AppError('Invalid or expired refresh token', 401);
+        try {
+            return jwt.verify(token, config.JWT_REFRESH_SECRET) as TokenPayload;
+        } catch {
+            throw new AppError('Invalid or expired refresh token', 401);
+        }
     }
 };
 export const decodeTokenExpiry = (token: string): number => {

@@ -33,4 +33,5 @@ message MembershipInfo {
   string role = 5;
   string sub_role = 6;
   string branch_id = 7;
+  int64 authz_version = 8;
 }

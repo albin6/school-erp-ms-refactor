@@ -1,83 +1,40 @@
 import { Request, Response, NextFunction } from 'express';
 import { validateTokenGrpc } from '../../../infrastructure/grpc/identity.client';
 import { AppError } from '../../../domain/errors/AppError';
-import { config } from '../../../config';
 import { logger } from '../../../config/logger';
 import { MembershipRepository } from '../../../infrastructure/database/MembershipRepository';
+import { verifyInternalAuthToken } from '../../../infrastructure/security/internal-token.service';
 
 type TenantRole = 'ADMIN' | 'STAFF' | 'STUDENT';
 
 const membershipRepo = new MembershipRepository();
-const trustedIpSet = new Set(
-    config.INTERNAL_TRUSTED_IPS
-        .split(',')
-        .map((ip) => ip.trim())
-        .filter(Boolean)
-);
-const normalizeIp = (value: string): string => value.replace(/^::ffff:/, '');
-const isPrivateOrLoopbackIp = (ip: string): boolean => {
-    const normalized = normalizeIp(ip);
-    if (normalized === '::1' || normalized === '127.0.0.1') return true;
-    if (normalized.startsWith('10.') || normalized.startsWith('192.168.') || normalized.startsWith('169.254.')) {
-        return true;
-    }
-    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(normalized)) {
-        return true;
-    }
-    return normalized.startsWith('fc') || normalized.startsWith('fd');
-};
-const getRequestSourceIps = (req: Request): string[] => {
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const forwardedIps = typeof forwardedFor === 'string'
-        ? forwardedFor.split(',').map((ip) => ip.trim()).filter(Boolean)
-        : [];
-    const remoteAddress = req.socket.remoteAddress ? [req.socket.remoteAddress] : [];
-    return [...new Set([...forwardedIps, ...remoteAddress].map(normalizeIp))];
-};
-const isTrustedInternalSource = (req: Request): boolean => {
-    const sourceIps = getRequestSourceIps(req);
-    if (sourceIps.some((ip) => trustedIpSet.has(ip))) {
-        return true;
-    }
-    return sourceIps.some(isPrivateOrLoopbackIp);
-};
+
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const internalSecret = req.headers['x-internal-auth-secret'];
-        const hasInternalAuthHeaders = Boolean(internalSecret || req.headers['x-auth-validated']);
-        if (config.INTERNAL_AUTH_SECRET && internalSecret === config.INTERNAL_AUTH_SECRET && req.headers['x-auth-validated'] === 'true') {
-            if (!isTrustedInternalSource(req)) {
-                logger.warn('Rejected trusted internal auth shortcut from untrusted source; falling back to gRPC validation', {
-                    sourceIps: getRequestSourceIps(req),
-                    host: req.headers.host,
-                });
-            } else {
-            const userId = req.headers['x-user-id'];
-            const email = req.headers['x-user-email'];
-            const role = req.headers['x-user-role'];
-                if (typeof userId === 'string' && typeof email === 'string' && typeof role === 'string') {
-                    (req as any).user = {
-                        valid: true,
-                        userId,
-                        email,
-                        role,
-                        tenantId: typeof req.headers['x-tenant-id'] === 'string' ? req.headers['x-tenant-id'] : '',
-                        subRole: typeof req.headers['x-user-subrole'] === 'string' ? req.headers['x-user-subrole'] : '',
-                    };
-                    next();
-                    return;
-                }
-                logger.warn('Internal auth shortcut missing required identity headers; falling back to gRPC validation', {
-                    sourceIps: getRequestSourceIps(req),
-                    host: req.headers.host,
-                });
-            }
-        } else if (hasInternalAuthHeaders) {
-            logger.warn('Suspicious internal auth headers detected with invalid or missing INTERNAL_AUTH_SECRET; falling back to gRPC validation', {
-                sourceIps: getRequestSourceIps(req),
+        const internalAuthToken = req.headers['x-internal-auth-token'];
+        if (typeof internalAuthToken === 'string' && internalAuthToken.trim()) {
+            const payload = verifyInternalAuthToken(internalAuthToken);
+            (req as any).user = {
+                valid: true,
+                userId: payload.sub,
+                email: payload.email,
+                role: payload.role,
+                platformRole: payload.platformRole ?? '',
+                tenantId: payload.tenantId ?? '',
+                tenantRole: payload.tenantRole ?? '',
+                subRole: payload.subRole ?? '',
+                authzVersion: payload.authzVersion ?? 0,
+            };
+            next();
+            return;
+        }
+
+        if (req.headers['x-auth-validated'] || req.headers['x-internal-auth-secret'] || req.headers['x-user-id']) {
+            logger.warn('Rejected legacy or spoofed internal auth headers; falling back to bearer token validation', {
                 host: req.headers.host,
             });
         }
+
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             throw new AppError('Authentication required', 401);
@@ -92,7 +49,7 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
 };
 export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
     const user = (req as any).user;
-    if (!user || user.role !== 'SUPER_ADMIN') {
+    if (!user || (user.platformRole || user.role) !== 'SUPER_ADMIN') {
         next(new AppError('Forbidden: Super Admin access required', 403));
         return;
     }
@@ -111,7 +68,7 @@ export const requireTenantAccess = (allowedRoles?: TenantRole[]) => {
             if (!tenantId) {
                 throw new AppError('Tenant context is required', 400);
             }
-            if (user.role === 'SUPER_ADMIN') {
+            if ((user.platformRole || user.role) === 'SUPER_ADMIN') {
                 next();
                 return;
             }
