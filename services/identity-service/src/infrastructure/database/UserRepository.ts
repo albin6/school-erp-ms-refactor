@@ -26,6 +26,16 @@ export class UserRepository implements IUserRepository {
         );
         return rows[0] ? this.toAggregate(rows[0]) : null;
     }
+    async findByIds(ids: string[]): Promise<User[]> {
+        if (ids.length === 0) {
+            return [];
+        }
+        const { rows } = await getPool().query(
+            `SELECT * FROM users WHERE id = ANY($1::uuid[])`,
+            [ids]
+        );
+        return rows.map((row) => this.toAggregate(row));
+    }
     async findByEmail(email: string): Promise<User | null> {
         const { rows } = await getPool().query(
             `SELECT * FROM users WHERE email = $1`,

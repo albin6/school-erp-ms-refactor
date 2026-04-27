@@ -144,6 +144,32 @@ const getUserByIdBreaker = new CircuitBreaker(callGetUserById, {
     errorThresholdPercentage: 50,
     resetTimeout: 10000,
 });
+
+const callBatchGetUsers = (userIds: string[]): Promise<UserProfileResult[]> => {
+    return new Promise((resolve, reject) => {
+        const deadline = new Date(Date.now() + 5000);
+        client.BatchGetUsers({ user_ids: userIds }, { deadline }, (error: grpc.ServiceError | null, response: any) => {
+            if (error) {
+                return reject(Object.assign(new AppError('Identity Service unavailable', 503), { code: error.code }));
+            }
+            resolve((response.users ?? []).map((user: any) => ({
+                userId: user.user_id,
+                email: user.email,
+                name: user.name,
+                isActive: user.is_active,
+                isSuperAdmin: user.is_super_admin,
+                mustResetPassword: user.must_reset_password,
+                createdAt: user.created_at,
+            })));
+        });
+    });
+};
+
+const batchGetUsersBreaker = new CircuitBreaker(callBatchGetUsers, {
+    timeout: 5500,
+    errorThresholdPercentage: 50,
+    resetTimeout: 10000,
+});
 export const validateTokenGrpc = async (token: string): Promise<TokenValidationResult> => {
     let lastError: AppError | null = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -189,6 +215,28 @@ export const getUserByIdGrpc = async (userId: string): Promise<UserProfileResult
     for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
             return await getUserByIdBreaker.fire(userId);
+        } catch (error: any) {
+            lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
+            if (attempt === 0 && shouldRetryGrpcError(error)) {
+                await sleep(100);
+                continue;
+            }
+            break;
+        }
+    }
+    throw lastError ?? new AppError('Identity Service unavailable', 503);
+};
+
+export const batchGetUsersGrpc = async (userIds: string[]): Promise<UserProfileResult[]> => {
+    const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+    if (uniqueUserIds.length === 0) {
+        return [];
+    }
+
+    let lastError: AppError | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+            return await batchGetUsersBreaker.fire(uniqueUserIds);
         } catch (error: any) {
             lastError = error instanceof AppError ? error : new AppError('Identity Service unavailable', 503);
             if (attempt === 0 && shouldRetryGrpcError(error)) {

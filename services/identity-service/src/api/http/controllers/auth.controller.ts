@@ -4,7 +4,7 @@ import { getPool } from '../../../infrastructure/database/db';
 import { UserRepository } from '../../../infrastructure/database/UserRepository';
 import { blacklistToken } from '../../../infrastructure/cache/redis.client';
 import { AppError } from '../../../domain/errors/AppError';
-import { decodeTokenExpiry, generateTokens, verifyRefreshToken } from '../../../infrastructure/security/token.service';
+import { decodeTokenExpiry, generateTokens, hashRefreshToken, TokenPayload, verifyRefreshToken } from '../../../infrastructure/security/token.service';
 import {
     initiatePasswordResetUseCase,
     verifyPasswordResetOtpUseCase,
@@ -44,6 +44,82 @@ const setRefreshTokenCookie = (res: Response, refreshToken: string): void => {
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+};
+
+interface RefreshTokenRow {
+    id: string;
+    user_id: string;
+    family_id: string;
+    expires_at: Date | string;
+    revoked_at: Date | string | null;
+}
+
+const rotateRefreshToken = async (
+    refreshToken: string,
+    payload: TokenPayload,
+    ip: string
+): Promise<{ accessToken: string; refreshToken: string }> => {
+    const client = await getPool().connect();
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+
+    try {
+        await client.query('BEGIN');
+
+        const { rows } = await client.query<RefreshTokenRow>(
+            `SELECT id, user_id, family_id, expires_at, revoked_at
+               FROM refresh_tokens
+              WHERE token_hash IN ($1, $2)
+              ORDER BY created_at DESC
+              LIMIT 1
+              FOR UPDATE`,
+            [refreshTokenHash, refreshToken]
+        );
+        const tokenRow = rows[0];
+
+        if (!tokenRow || tokenRow.user_id !== payload.userId || new Date(tokenRow.expires_at) <= new Date()) {
+            throw new AppError('Invalid or expired refresh token', 401);
+        }
+
+        if (tokenRow.revoked_at) {
+            await client.query(
+                `UPDATE refresh_tokens
+                    SET revoked_at = COALESCE(revoked_at, NOW())
+                  WHERE family_id = $1`,
+                [tokenRow.family_id]
+            );
+            throw new AppError('Invalid or expired refresh token', 401);
+        }
+
+        const nextTokens = generateTokens({
+            userId: payload.userId,
+            email: payload.email,
+            role: payload.role,
+            tenantId: payload.tenantId,
+            subRole: payload.subRole,
+        });
+        const nextRefreshTokenHash = hashRefreshToken(nextTokens.refreshToken);
+        const nextRefreshExpiry = new Date(decodeTokenExpiry(nextTokens.refreshToken) * 1000);
+
+        await client.query(
+            `UPDATE refresh_tokens
+                SET revoked_at = NOW()
+              WHERE id = $1 AND revoked_at IS NULL`,
+            [tokenRow.id]
+        );
+        await client.query(
+            `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, created_ip)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [payload.userId, nextRefreshTokenHash, tokenRow.family_id, nextRefreshExpiry, ip]
+        );
+
+        await client.query('COMMIT');
+        return nextTokens;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
 };
 
 const resolveTenantFromRoute = async (tenantIdentifier: string) => {
@@ -137,11 +213,12 @@ export const logoutController = async (req: Request, res: Response, next: NextFu
             await blacklistToken(accessToken, ttlSeconds);
         }
         if (refreshToken) {
+            const refreshTokenHash = hashRefreshToken(refreshToken);
             await getPool().query(
                 `UPDATE refresh_tokens
              SET revoked_at = NOW()
-           WHERE token_hash = $1 AND revoked_at IS NULL`,
-                [refreshToken]
+           WHERE token_hash IN ($1, $2) AND revoked_at IS NULL`,
+                [refreshTokenHash, refreshToken]
             );
         }
         res.clearCookie('refreshToken');
@@ -242,31 +319,13 @@ export const tenantRefreshController = async (req: Request, res: Response, next:
         if (payload.tenantId !== tenant.tenantId) {
             throw new AppError('Invalid or expired refresh token', 401);
         }
-
-        const { rows } = await getPool().query(
-            `SELECT user_id, expires_at, revoked_at
-         FROM refresh_tokens
-        WHERE token_hash = $1
-        ORDER BY created_at DESC
-        LIMIT 1`,
-            [refreshToken]
-        );
-        const tokenRow = rows[0];
-        if (!tokenRow || tokenRow.revoked_at || new Date(tokenRow.expires_at) <= new Date()) {
-            throw new AppError('Invalid or expired refresh token', 401);
-        }
-
-        const { accessToken } = generateTokens({
-            userId: payload.userId,
-            email: payload.email,
-            role: payload.role,
-            tenantId: payload.tenantId,
-            subRole: payload.subRole,
-        });
+        const ip = (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+        const tokens = await rotateRefreshToken(refreshToken, payload, ip);
+        setRefreshTokenCookie(res, tokens.refreshToken);
 
         res.status(200).json({
             success: true,
-            data: { accessToken },
+            data: { accessToken: tokens.accessToken },
         });
     } catch (error) {
         next(error);
@@ -289,28 +348,12 @@ export const refreshController = async (req: Request, res: Response, next: NextF
             throw new AppError('Refresh token is required', 401);
         }
         const payload = verifyRefreshToken(refreshToken);
-        const { rows } = await getPool().query(
-            `SELECT user_id, expires_at, revoked_at
-         FROM refresh_tokens
-        WHERE token_hash = $1
-        ORDER BY created_at DESC
-        LIMIT 1`,
-            [refreshToken]
-        );
-        const tokenRow = rows[0];
-        if (!tokenRow || tokenRow.revoked_at || new Date(tokenRow.expires_at) <= new Date()) {
-            throw new AppError('Invalid or expired refresh token', 401);
-        }
-        const { accessToken } = generateTokens({
-            userId: payload.userId,
-            email: payload.email,
-            role: payload.role,
-            tenantId: payload.tenantId,
-            subRole: payload.subRole,
-        });
+        const ip = (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+        const tokens = await rotateRefreshToken(refreshToken, payload, ip);
+        setRefreshTokenCookie(res, tokens.refreshToken);
         res.status(200).json({
             success: true,
-            data: { accessToken },
+            data: { accessToken: tokens.accessToken },
         });
     } catch (error) {
         next(error);

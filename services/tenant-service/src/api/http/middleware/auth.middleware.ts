@@ -3,6 +3,11 @@ import { validateTokenGrpc } from '../../../infrastructure/grpc/identity.client'
 import { AppError } from '../../../domain/errors/AppError';
 import { config } from '../../../config';
 import { logger } from '../../../config/logger';
+import { MembershipRepository } from '../../../infrastructure/database/MembershipRepository';
+
+type TenantRole = 'ADMIN' | 'STAFF' | 'STUDENT';
+
+const membershipRepo = new MembershipRepository();
 const trustedIpSet = new Set(
     config.INTERNAL_TRUSTED_IPS
         .split(',')
@@ -92,4 +97,43 @@ export const requireSuperAdmin = (req: Request, res: Response, next: NextFunctio
         return;
     }
     next();
+};
+
+export const requireTenantAccess = (allowedRoles?: TenantRole[]) => {
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const user = (req as any).user;
+            const tenantId = req.params.tenantId ?? req.params.id;
+
+            if (!user) {
+                throw new AppError('Authentication required', 401);
+            }
+            if (!tenantId) {
+                throw new AppError('Tenant context is required', 400);
+            }
+            if (user.role === 'SUPER_ADMIN') {
+                next();
+                return;
+            }
+            if (user.tenantId && user.tenantId !== tenantId) {
+                throw new AppError('Forbidden: Tenant context mismatch', 403);
+            }
+
+            const existingMembership = (req as any).tenantMembership;
+            const membership = existingMembership?.tenantId === tenantId
+                ? existingMembership
+                : await membershipRepo.findByUserAndTenant(user.userId, tenantId);
+            if (!membership) {
+                throw new AppError('Forbidden: Tenant access required', 403);
+            }
+            if (allowedRoles && !allowedRoles.includes(membership.role as TenantRole)) {
+                throw new AppError('Forbidden: Insufficient tenant role', 403);
+            }
+
+            (req as any).tenantMembership = membership;
+            next();
+        } catch (error) {
+            next(error);
+        }
+    };
 };

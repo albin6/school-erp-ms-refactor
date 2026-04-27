@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { UserRepository } from '../../infrastructure/database/UserRepository';
 import { verifyPassword } from '../../infrastructure/security/password.service';
-import { generateTokens } from '../../infrastructure/security/token.service';
+import { generateTokens, hashRefreshToken } from '../../infrastructure/security/token.service';
 import { withTransaction } from '../../infrastructure/database/db';
 import { insertOutboxEvent } from '../../infrastructure/database/outbox.repository';
 import { AppError } from '../../domain/errors/AppError';
@@ -69,6 +69,7 @@ export const loginUseCase = async (cmd: LoginCommand): Promise<LoginResult> => {
     user.recordSuccessfulLogin();
     const role = user.isSuperAdmin ? 'SUPER_ADMIN' : 'USER';
     const { accessToken, refreshToken } = generateTokens({ userId: user.id, email: user.email, role });
+    const refreshTokenHash = hashRefreshToken(refreshToken);
     const familyId = uuidv4();
     const expiresAt = new Date(Date.now() + ms(config.JWT_REFRESH_EXPIRES_IN as string));
     await withTransaction(async (client) => {
@@ -76,7 +77,7 @@ export const loginUseCase = async (cmd: LoginCommand): Promise<LoginResult> => {
         await client.query(
             `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, created_ip)
          VALUES ($1, $2, $3, $4, $5)`,
-            [user.id, refreshToken, familyId, expiresAt, cmd.ip]
+            [user.id, refreshTokenHash, familyId, expiresAt, cmd.ip]
         );
         await insertOutboxEvent(
             client,

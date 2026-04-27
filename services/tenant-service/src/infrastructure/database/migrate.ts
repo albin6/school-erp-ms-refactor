@@ -6,10 +6,12 @@ export const runMigrations = async (): Promise<void> => {
     await pool.query(`
     -- Create enums if they don't exist
     DO $$ BEGIN
-      CREATE TYPE tenant_status_enum AS ENUM ('ACTIVE', 'INACTIVE', 'SUSPENDED');
+      CREATE TYPE tenant_status_enum AS ENUM ('PROVISIONING', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'FAILED');
     EXCEPTION
       WHEN duplicate_object THEN null;
     END $$;
+    ALTER TYPE tenant_status_enum ADD VALUE IF NOT EXISTS 'PROVISIONING';
+    ALTER TYPE tenant_status_enum ADD VALUE IF NOT EXISTS 'FAILED';
     DO $$ BEGIN
       CREATE TYPE membership_role_enum AS ENUM ('ADMIN', 'STAFF', 'STUDENT');
     EXCEPTION

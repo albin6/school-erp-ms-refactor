@@ -3,7 +3,7 @@ import ms from 'ms';
 import { AppError } from '../../domain/errors/AppError';
 import { UserRepository } from '../../infrastructure/database/UserRepository';
 import { verifyPassword } from '../../infrastructure/security/password.service';
-import { generateTokens } from '../../infrastructure/security/token.service';
+import { generateTokens, hashRefreshToken } from '../../infrastructure/security/token.service';
 import { getMembership, resolveTenantIdentifier } from '../../infrastructure/grpc/tenant.client';
 import { withTransaction } from '../../infrastructure/database/db';
 import { insertOutboxEvent } from '../../infrastructure/database/outbox.repository';
@@ -124,6 +124,7 @@ export const tenantLoginUseCase = async (cmd: TenantLoginCommand): Promise<Tenan
         tenantId: tenant.tenantId,
         subRole: membership.subRole || undefined,
     });
+    const refreshTokenHash = hashRefreshToken(refreshToken);
     const familyId = uuidv4();
     const expiresAt = new Date(Date.now() + ms(config.JWT_REFRESH_EXPIRES_IN as string));
 
@@ -132,7 +133,7 @@ export const tenantLoginUseCase = async (cmd: TenantLoginCommand): Promise<Tenan
         await client.query(
             `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, created_ip)
              VALUES ($1, $2, $3, $4, $5)`,
-            [user.id, refreshToken, familyId, expiresAt, cmd.ip]
+            [user.id, refreshTokenHash, familyId, expiresAt, cmd.ip]
         );
         await insertOutboxEvent(
             client,

@@ -16,6 +16,15 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 const identityProto = grpc.loadPackageDefinition(packageDefinition) as any;
 const userRepo = new UserRepository();
+const mapUserProfile = (user: any) => ({
+    user_id: user.id,
+    email: user.email,
+    name: user.name,
+    is_active: user.isActive,
+    is_super_admin: user.isSuperAdmin,
+    must_reset_password: user.mustResetPassword,
+    created_at: user.createdAt.toISOString(),
+});
 const handlers = {
     ValidateToken: async (call: any, callback: any) => {
         try {
@@ -41,15 +50,7 @@ const handlers = {
         try {
             const user = await userRepo.findById(call.request.user_id);
             if (!user) throw new Error('User not found');
-            callback(null, {
-                user_id: user.id,
-                email: user.email,
-                name: user.name,
-                is_active: user.isActive,
-                is_super_admin: user.isSuperAdmin,
-                must_reset_password: user.mustResetPassword,
-                created_at: user.createdAt.toISOString(),
-            });
+            callback(null, mapUserProfile(user));
         } catch (error: any) {
             callback({ code: grpc.status.NOT_FOUND, details: error.message });
         }
@@ -58,17 +59,21 @@ const handlers = {
         try {
             const user = await userRepo.findByEmail(call.request.email);
             if (!user) throw new Error('User not found');
-            callback(null, {
-                user_id: user.id,
-                email: user.email,
-                name: user.name,
-                is_active: user.isActive,
-                is_super_admin: user.isSuperAdmin,
-                must_reset_password: user.mustResetPassword,
-                created_at: user.createdAt.toISOString(),
-            });
+            callback(null, mapUserProfile(user));
         } catch (error: any) {
             callback({ code: grpc.status.NOT_FOUND, details: error.message });
+        }
+    },
+    BatchGetUsers: async (call: any, callback: any) => {
+        try {
+            const userIds = Array.from(new Set((call.request.user_ids ?? []).filter(Boolean)));
+            const users = await userRepo.findByIds(userIds as string[]);
+            callback(null, {
+                users: users.map(mapUserProfile),
+            });
+        } catch (error: any) {
+            logger.error('gRPC BatchGetUsers error', { error: error.message });
+            callback({ code: grpc.status.INTERNAL, details: error.message });
         }
     },
     CreateUser: async (call: any, callback: any) => {

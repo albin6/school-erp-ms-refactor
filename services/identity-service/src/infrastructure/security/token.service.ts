@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 import { config } from '../../config';
 import { AppError } from '../../domain/errors/AppError';
 export interface TokenPayload {
@@ -67,4 +68,8 @@ export const verifyRefreshToken = (token: string): TokenPayload => {
 export const decodeTokenExpiry = (token: string): number => {
     const decoded = jwt.decode(token) as TokenPayload;
     return decoded?.exp ?? 0;
+};
+
+export const hashRefreshToken = (token: string): string => {
+    return createHash('sha256').update(token).digest('hex');
 };

@@ -7,7 +7,7 @@ import { Membership } from '../../../domain/aggregates/Membership';
 import { MembershipRepository } from '../../../infrastructure/database/MembershipRepository';
 import { BranchRepository } from '../../../infrastructure/database/BranchRepository';
 import { TenantRepository } from '../../../infrastructure/database/TenantRepository';
-import { createUserGrpc, getUserByIdGrpc } from '../../../infrastructure/grpc/identity.client';
+import { batchGetUsersGrpc, createUserGrpc } from '../../../infrastructure/grpc/identity.client';
 
 const membershipRepo = new MembershipRepository();
 const branchRepo = new BranchRepository();
@@ -101,9 +101,19 @@ export const getTenantUsersController = async (req: Request, res: Response, next
             getPool().query(listQuery, values),
         ]);
 
-        const users = await Promise.all(
-            rows.map(async (row) => {
-                const user = await getUserByIdGrpc(row.user_id);
+        const identityUsers = await batchGetUsersGrpc(rows.map((row) => row.user_id));
+        const identityUserById = new Map(identityUsers.map((user) => [user.userId, user]));
+        const users = rows
+            .map((row) => {
+                const user = identityUserById.get(row.user_id);
+                if (!user) {
+                    logger.warn('Skipping membership with missing identity user', {
+                        tenantId,
+                        membershipId: row.id,
+                        userId: row.user_id,
+                    });
+                    return null;
+                }
                 return {
                     id: row.id,
                     user_id: row.user_id,
@@ -122,7 +132,7 @@ export const getTenantUsersController = async (req: Request, res: Response, next
                     created_at: row.created_at,
                 };
             })
-        );
+            .filter((user): user is NonNullable<typeof user> => user !== null);
 
         const filteredUsers = search
             ? users.filter((user) =>

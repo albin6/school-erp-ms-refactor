@@ -7,6 +7,7 @@ import { withTransaction } from '../../infrastructure/database/db';
 import { AppError } from '../../domain/errors/AppError';
 import { Membership } from '../../domain/aggregates/Membership';
 import { createUserGrpc } from '../../infrastructure/grpc/identity.client';
+import { logger } from '../../config/logger';
 export interface CreateTenantCommand {
     name: string;
     subdomain: string;
@@ -26,54 +27,74 @@ export const createTenantUseCase = async (cmd: CreateTenantCommand): Promise<Cre
         throw new AppError('Tenant with this subdomain already exists', 409);
     }
 
-    const adminName = `${cmd.name} Admin`;
-    const adminUser = await createUserGrpc(
-        cmd.adminEmail,
-        adminName,
-        `tenant-admin:${cmd.subdomain}:${cmd.adminEmail.toLowerCase().trim()}`,
-        true,
-        cmd.correlationId
-    );
-
     const tenant = new Tenant({
         name: cmd.name,
         subdomain: cmd.subdomain,
         domain: cmd.domain,
         createdBy: cmd.createdBy,
+        status: 'PROVISIONING',
+        isActive: false,
     });
     await withTransaction(async (client) => {
         await tenantRepo.save(tenant, client);
-
-        const existingMembership = await membershipRepo.findByUserAndTenant(adminUser.userId, tenant.id);
-        if (!existingMembership) {
-            await membershipRepo.save(
-                new Membership({
-                    userId: adminUser.userId,
-                    tenantId: tenant.id,
-                    role: 'ADMIN',
-                }),
-                client
-            );
-        }
-
-        await insertOutboxEvent(
-            client,
-            {
-                eventId: uuidv4(),
-                eventType: 'tenant.created',
-                aggregateId: tenant.id,
-                occurredAt: new Date().toISOString(),
-                correlationId: cmd.correlationId,
-                payload: {
-                    tenantId: tenant.id,
-                    name: tenant.name,
-                    subdomain: tenant.subdomain,
-                    adminEmail: cmd.adminEmail,
-                    createdBy: tenant.createdBy,
-                },
-            },
-            'Tenant'
-        );
     });
+
+    try {
+        const adminName = `${cmd.name} Admin`;
+        const adminUser = await createUserGrpc(
+            cmd.adminEmail,
+            adminName,
+            `tenant-admin:${cmd.subdomain}:${cmd.adminEmail.toLowerCase().trim()}`,
+            true,
+            cmd.correlationId
+        );
+
+        await withTransaction(async (client) => {
+            const existingMembership = await membershipRepo.findByUserAndTenant(adminUser.userId, tenant.id);
+            if (!existingMembership) {
+                await membershipRepo.save(
+                    new Membership({
+                        userId: adminUser.userId,
+                        tenantId: tenant.id,
+                        role: 'ADMIN',
+                    }),
+                    client
+                );
+            }
+
+            tenant.activate();
+            await tenantRepo.update(tenant, client);
+
+            await insertOutboxEvent(
+                client,
+                {
+                    eventId: uuidv4(),
+                    eventType: 'tenant.created',
+                    aggregateId: tenant.id,
+                    occurredAt: new Date().toISOString(),
+                    correlationId: cmd.correlationId,
+                    payload: {
+                        tenantId: tenant.id,
+                        name: tenant.name,
+                        subdomain: tenant.subdomain,
+                        adminEmail: cmd.adminEmail,
+                        createdBy: tenant.createdBy,
+                    },
+                },
+                'Tenant'
+            );
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        tenant.failProvisioning(message);
+        await tenantRepo.update(tenant).catch((updateError) => {
+            logger.error('Failed to mark tenant provisioning as failed', {
+                tenantId: tenant.id,
+                error: updateError instanceof Error ? updateError.message : String(updateError),
+            });
+        });
+        throw error;
+    }
+
     return { tenantId: tenant.id };
 };

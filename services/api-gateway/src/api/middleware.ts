@@ -14,6 +14,14 @@ interface CachedTenantContext {
     isActive?: boolean;
 }
 
+const normalizeTenantSubdomain = (value: string | undefined): string | null => {
+    const candidate = value?.trim().toLowerCase();
+    if (!candidate || candidate === 'www' || candidate === 'sadmin') {
+        return null;
+    }
+    return /^[a-z0-9-]+$/.test(candidate) ? candidate : null;
+};
+
 export const gatewayMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const correlationId = (req.headers['x-correlation-id'] as string) || uuidv4();
@@ -22,9 +30,12 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
         
         const host = req.headers.host || '';
         const subdomainMatches = host.match(/^([a-z0-9-]+)\.localhost/);
+        const headerSubdomain = Array.isArray(req.headers['x-tenant-subdomain'])
+            ? req.headers['x-tenant-subdomain'][0]
+            : req.headers['x-tenant-subdomain'];
         let tenantId = '';
-        if (subdomainMatches && subdomainMatches[1] !== 'www') {
-            const subdomain = subdomainMatches[1];
+        const subdomain = normalizeTenantSubdomain(subdomainMatches?.[1] ?? headerSubdomain);
+        if (subdomain) {
             logger.info(`[${correlationId}] Resolving subdomain: ${subdomain}`, { correlationId });
             try {
                 const cacheKey = `tenant:subdomain:${subdomain}`;

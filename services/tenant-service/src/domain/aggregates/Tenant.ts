@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from '../errors/AppError';
-export type TenantStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+export type TenantStatus = 'PROVISIONING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'FAILED';
 export interface TenantProps {
     id?: string;
     name: string;
@@ -58,5 +58,13 @@ export class Tenant {
         this.status = 'ACTIVE';
         this.isActive = true;
         this.updatedAt = new Date();
+    }
+    failProvisioning(reason: string): void {
+        this.status = 'FAILED';
+        this.isActive = false;
+        this.updateSettings({
+            provisioningError: reason,
+            provisioningFailedAt: new Date().toISOString(),
+        });
     }
 }

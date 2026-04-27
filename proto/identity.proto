@@ -6,6 +6,7 @@ service IdentityService {
   rpc GetUserById(GetUserByIdRequest) returns (UserProfile);
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc GetUserByEmail(GetUserByEmailRequest) returns (UserProfile);
+  rpc BatchGetUsers(BatchGetUsersRequest) returns (BatchGetUsersResponse);
 }
 message ValidateTokenRequest {
   string token = 1;
@@ -24,6 +25,9 @@ message GetUserByIdRequest {
 }
 message GetUserByEmailRequest {
   string email = 1;
+}
+message BatchGetUsersRequest {
+  repeated string user_ids = 1;
 }
 message UserProfile {
   string user_id = 1;
@@ -44,4 +48,7 @@ message CreateUserResponse {
   string user_id = 1;
   string temporary_password = 2;
   bool already_existed = 3;
+}
+message BatchGetUsersResponse {
+  repeated UserProfile users = 1;
 }
