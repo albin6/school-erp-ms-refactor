@@ -21,6 +21,7 @@ const ForgotPasswordPage = lazy(() => import('@/modules/auth/pages/ForgotPasswor
 const VerifyOTPPage = lazy(() => import('@/modules/auth/pages/VerifyOTPPage').then(module => ({ default: module.VerifyOTPPage })));
 const ResetPasswordPage = lazy(() => import('@/modules/auth/pages/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })));
 const BranchManagement = lazy(() => import('@/modules/tenant/pages/BranchManagement').then(module => ({ default: module.BranchManagement })));
+const AcademicManagement = lazy(() => import('@/modules/tenant/pages/AcademicManagement').then(module => ({ default: module.AcademicManagement })));
 const UserManagement = lazy(() => import('@/modules/tenant/pages/UserManagement').then(module => ({ default: module.UserManagement })));
 const BranchSelection = lazy(() => import('@/modules/tenant/pages/users/BranchSelection').then(module => ({ default: module.BranchSelection })));
 
@@ -61,6 +62,7 @@ export const TenantRouter = () => {
                     <Route element={<TenantAdminLayout />}>
                         <Route path="/admin/dashboard" element={<TenantAdminDashboard />} />
                         <Route path="/admin/branches" element={<BranchManagement />} />
+                        <Route path="/admin/academic" element={<AcademicManagement />} />
                         <Route path="/admin/users" element={<BranchSelection />} />
                         <Route path="/admin/users/:branchId" element={<UserManagement />} />
                         <Route path="/admin/students" element={<StudentsManagement />} />

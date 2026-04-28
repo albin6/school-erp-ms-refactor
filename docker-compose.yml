@@ -4,6 +4,7 @@ networks:
 volumes:
   identity_db_data:
   tenant_db_data:
+  academic_db_data:
   notification_db_data:
   audit_db_data:
   redis_data:
@@ -43,6 +44,23 @@ services:
     networks: [ school-erp-net ]
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U tenant_user -d tenant_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  academic-db:
+    image: postgres:16-alpine
+    container_name: academic-db
+    environment:
+      POSTGRES_DB: academic_db
+      POSTGRES_USER: academic_user
+      POSTGRES_PASSWORD: academic_pass
+    volumes:
+      - academic_db_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks: [ school-erp-net ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U academic_user -d academic_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -215,6 +233,22 @@ services:
         condition: service_healthy
     networks: [ school-erp-net ]
     restart: unless-stopped
+  academic-service:
+    build:
+      context: .
+      dockerfile: ./services/academic-service/Dockerfile
+      target: production
+    container_name: academic-service
+    env_file: ./services/academic-service/.env
+    ports:
+      - "3005:3000"
+    depends_on:
+      academic-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [ school-erp-net ]
+    restart: unless-stopped
   audit-service:
     build:
       context: .
@@ -243,6 +277,8 @@ services:
       identity-service:
         condition: service_started
       tenant-service:
+        condition: service_started
+      academic-service:
         condition: service_started
       redis:
         condition: service_healthy

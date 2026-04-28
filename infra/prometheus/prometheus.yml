@@ -13,6 +13,9 @@ scrape_configs:
   - job_name: 'tenant-service'
     static_configs:
       - targets: ['tenant-service:3000']
+  - job_name: 'academic-service'
+    static_configs:
+      - targets: ['academic-service:3000']
   - job_name: 'notification-service'
     static_configs:
       - targets: ['notification-service:3000']

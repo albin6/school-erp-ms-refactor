@@ -4,7 +4,7 @@ import { config } from '../../config';
 
 export interface InternalAuthTokenPayload {
     iss: 'api-gateway';
-    aud: 'tenant-service';
+    aud: 'tenant-service' | 'academic-service';
     sub: string;
     email: string;
     role: string;
@@ -39,11 +39,12 @@ export const signInternalAuthToken = (payload: {
     subRole?: string;
     authzVersion?: number;
     correlationId: string;
+    audience?: 'tenant-service' | 'academic-service';
 }): string => {
     const now = Math.floor(Date.now() / 1000);
     const tokenPayload: InternalAuthTokenPayload = {
         iss: 'api-gateway',
-        aud: 'tenant-service',
+        aud: payload.audience ?? 'tenant-service',
         sub: payload.userId,
         email: payload.email,
         role: payload.role,

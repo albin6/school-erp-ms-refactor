@@ -42,4 +42,32 @@ describe('signInternalAuthToken', () => {
         expect(payload.exp - payload.iat).toBeLessThanOrEqual(300);
         expect(payload.jti).toBeTruthy();
     });
+
+    it('creates an academic-service scoped token when requested', () => {
+        const token = signInternalAuthToken({
+            userId: 'teacher-1',
+            email: 'teacher@example.com',
+            role: 'STAFF',
+            tenantRole: 'STAFF',
+            tenantId: 'tenant-1',
+            subRole: 'TEACHER',
+            correlationId: 'corr-2',
+            audience: 'academic-service',
+        });
+
+        const [, body] = token.split('.');
+        const payload = decodeBase64UrlJson<Record<string, any>>(body);
+
+        expect(payload).toMatchObject({
+            iss: 'api-gateway',
+            aud: 'academic-service',
+            sub: 'teacher-1',
+            email: 'teacher@example.com',
+            role: 'STAFF',
+            tenantRole: 'STAFF',
+            tenantId: 'tenant-1',
+            subRole: 'TEACHER',
+            correlationId: 'corr-2',
+        });
+    });
 });

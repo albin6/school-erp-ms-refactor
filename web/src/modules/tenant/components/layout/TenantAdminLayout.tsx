@@ -9,6 +9,7 @@ import {
     MenuUnfoldOutlined,
     SettingOutlined,
     BankOutlined,
+    BookOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTenantAuthStore } from '@/store/tenantAuthStore';
@@ -45,6 +46,12 @@ export const TenantAdminLayout = () => {
             icon: <BankOutlined />,
             label: 'Branches',
             onClick: () => navigate('/admin/branches'),
+        },
+        {
+            key: '/admin/academic',
+            icon: <BookOutlined />,
+            label: 'Academic',
+            onClick: () => navigate('/admin/academic'),
         },
         {
             key: '/admin/users',

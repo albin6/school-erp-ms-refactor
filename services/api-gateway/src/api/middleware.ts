@@ -105,6 +105,7 @@ export const gatewayMiddleware = async (req: Request, res: Response, next: NextF
                     subRole: payload.subRole || undefined,
                     authzVersion: payload.authzVersion || undefined,
                     correlationId,
+                    audience: req.path.startsWith('/api/academic') ? 'academic-service' : 'tenant-service',
                 });
             } catch (err) {
                 logger.error(`[${correlationId}] Token validation error:`, err, { correlationId });

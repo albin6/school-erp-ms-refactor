@@ -10,6 +10,7 @@ const envSchema = z.object({
     REDIS_URL: z.string().url(),
     IDENTITY_SERVICE_URL: z.string().url(),
     TENANT_SERVICE_URL: z.string().url(),
+    ACADEMIC_SERVICE_URL: z.string().url(),
     IDENTITY_GRPC_HOST: z.string().min(1),
     TENANT_GRPC_HOST: z.string().min(1),
     CORS_ALLOWED_ORIGINS: z.string().default('http://localhost:5173,http://sub1.localhost:5173'),

@@ -66,6 +66,7 @@ export const createHttpServer = () => {
         '/api/tenants': config.TENANT_SERVICE_URL,
         '/api/branches': config.TENANT_SERVICE_URL,
         '/api/memberships': config.TENANT_SERVICE_URL,
+        '/api/academic': config.ACADEMIC_SERVICE_URL,
     };
 
     // Create HTTP agents with timeout settings
